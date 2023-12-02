@@ -23,7 +23,7 @@ struct SqRes {
 
 impl BinaryOpResult for AddRes {
     fn get_args(&self) -> (Rc<Node>, Rc<Node>) {
-        (self.result_of.0.clone(), self.result_of.1.clone())
+        self.result_of.clone()
     }
     fn get_grads(&self) -> (f64, f64) {
         (1., 1.,)
