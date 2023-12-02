@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 use std::rc::Rc;
 
-type DVal = f64;
-
 #[derive(Debug)]
 enum Num {
     Res(Box<dyn Backable>),
@@ -32,17 +30,10 @@ impl Num {
 
 trait Backable: Debug {
     fn val(&self) -> f64;
-    fn back_params(&self, upstream: f64) -> Vec<DVal>;
     fn back_graph(&self, upstream: f64) -> DNum;
 }
 
 impl Backable for Num {
-    fn back_params(&self, upstream: f64) -> Vec<DVal> {
-        match self {
-            Num::Res(res) => res.back_params(upstream),
-            Num::Param(_) => vec![upstream],
-        }
-    }
     fn back_graph(&self, upstream: f64) -> DNum {
         match self {
             Num::Res(res) => res.back_graph(upstream),
@@ -81,12 +72,6 @@ struct SqRes {
 }
 
 impl Backable for AddRes {
-    fn back_params(&self, upstream: f64) -> Vec<DVal> {
-        self.result_of
-            .iter()
-            .flat_map(|arg| arg.back_params(upstream))
-            .collect()
-    }
     fn back_graph(&self, upstream: f64) -> DNum {
         DNum::Res(Box::new(AddRes {
             val: upstream,
@@ -104,13 +89,6 @@ impl Backable for AddRes {
 }
 
 impl Backable for MulRes {
-    fn back_params(&self, upstream: f64) -> Vec<DVal> {
-        let a = &self.result_of.0;
-        let b = &self.result_of.1;
-        let a_d = a.back_params(upstream * b.val());
-        let b_d = b.back_params(upstream * a.val());
-        a_d.into_iter().chain(b_d).collect()
-    }
     fn back_graph(&self, upstream: f64) -> DNum {
         let a = &self.result_of.0;
         let b = &self.result_of.1;
@@ -136,9 +114,6 @@ impl  SqRes {
 }
 
 impl Backable for SqRes {
-    fn back_params(&self, upstream: f64) -> Vec<DVal> {
-        self.result_of.back_params(self.d(upstream))
-    }
     fn back_graph(&self, upstream: f64) -> DNum {
         DNum::Res(Box::new(SqRes {
             val: upstream,
@@ -179,9 +154,6 @@ fn main() {
     let res1 = add(mul(a.clone(), b.clone()), sq(c.clone()));
 
     let res2 = add(res1.clone(), c.clone());
-
-    let d_params = res2.back_params(1.);
-    println!("{:?}", d_params);
 
     let d_graph = res2.back_graph(1.);
     println!("{:?}", d_graph);
