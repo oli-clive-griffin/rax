@@ -145,14 +145,14 @@ fn main() {
     let a = Num::param(1.0);
     let b = Num::param(2.0);
     let c = Num::param(3.0);
-
     let res1 = add(mul(a.clone(), b.clone()), sq(c.clone()));
-
     let res2 = add(res1.clone(), c.clone());
-
-    let d_graph = res2.back_graph(1.);
-    println!("{:?}", d_graph);
+    println!("{:?}", res2.back_graph(1.));
 }
 
-// could probably create a BinaryOp Trait which is
-// differentiable and has an abstract fn d(self) -> (f64, f64)
+// todo:
+// try backgraph returning Rc so less wrapping
+// try impl abstracted binary, unary op
+//   could probably create a BinaryOp Trait which is
+//   differentiable and has an abstract fn d(self) -> (f64, f64)
+
