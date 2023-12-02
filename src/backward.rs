@@ -35,7 +35,7 @@ fn unary_op_trace(
 }
 
 fn binary_op_res_back_trace(
-    op_result: &Box<&dyn BinaryOpResult>,
+    op_result: &Box<dyn BinaryOpResult>,
     upstream: f64,
 ) -> DTrace {
     let (arg1, arg2) = op_result.get_args();
