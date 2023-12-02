@@ -5,7 +5,7 @@ use std::rc::Rc;
 pub enum Node {
     BinaryOpResult(Box<dyn BinaryOpResult>),
     UnaryOpResult(Box<dyn UnaryOpResult>),
-    Param(f64),
+    Param(f64, &'static str),
 }
 
 pub trait BinaryOpResult: Debug {
@@ -31,15 +31,15 @@ impl Node {
         Rc::new(Node::BinaryOpResult(Box::new(res)))
     }
 
-    pub fn param(val: f64) -> Rc<Node> {
-        Rc::new(Node::Param(val))
+    pub fn param(val: f64, name: &'static str) -> Rc<Node> {
+        Rc::new(Node::Param(val, name))
     }
 
     pub fn val(&self) -> f64 {
         match self {
             Node::BinaryOpResult(res) => res.val(),
             Node::UnaryOpResult(res) => res.val(),
-            Node::Param(val) => *val,
+            Node::Param(val, _name) => *val,
         }
     }
 }

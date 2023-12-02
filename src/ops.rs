@@ -20,7 +20,6 @@ struct SqRes {
     result_of: Rc<Node>,
 }
 
-
 impl BinaryOpResult for AddRes {
     fn get_args(&self) -> (Rc<Node>, Rc<Node>) {
         self.result_of.clone()
