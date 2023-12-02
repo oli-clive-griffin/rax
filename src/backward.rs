@@ -35,8 +35,8 @@ pub enum DTrace {
 pub fn backward(node: Rc<Node>, upstream: f64) -> DTrace {
     match &*node {
         Node::Param(original_val, name) => param_trace(upstream, Rc::as_ptr(&node), *original_val, name),
-        Node::UnaryOpResult(op_result) => unary_op_trace(op_result, upstream),
-        Node::BinaryOpResult(op_result) => binary_op_res_back_trace(op_result, upstream),
+        Node::UnaryOpResult(op_result) => unary_op_trace(upstream, op_result),
+        Node::BinaryOpResult(op_result) => binary_op_res_back_trace(upstream, op_result),
     }
 }
 
@@ -50,8 +50,8 @@ fn param_trace(upstream: f64, original_ptr: *const Node, original_val: f64, name
 }
 
 fn unary_op_trace(
-    op_result: &Box<dyn UnaryOpResult>,
     upstream: f64,
+    op_result: &Box<dyn UnaryOpResult>,
 ) -> DTrace {
     let arg = op_result.get_arg();
     let grad = op_result.get_grad();
@@ -64,8 +64,8 @@ fn unary_op_trace(
 }
 
 fn binary_op_res_back_trace(
-    op_result: &Box<dyn BinaryOpResult>,
     upstream: f64,
+    op_result: &Box<dyn BinaryOpResult>,
 ) -> DTrace {
     let (arg1, arg2) = op_result.get_args();
     let (d_arg1, d_arg2) = op_result.get_grads();
