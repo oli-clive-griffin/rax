@@ -48,11 +48,6 @@ impl Backable for Num {
     }
 }
 
-// NOTE:
-// usage of non-boxed `Num`s here means we can't
-// construct graphs with splits (there's gotta be a proper name for that in graph theory)
-// i.e. a Num can't be used in 2 ops.
-
 #[derive(Debug)]
 struct AddRes {
     val: f64,
@@ -117,7 +112,7 @@ impl Backable for SqRes {
     fn back_graph(&self, upstream: f64) -> DNum {
         DNum::Res(Box::new(SqRes {
             val: upstream,
-            result_of: Rc::new(self.result_of.back_graph(2. * self.result_of.val() * upstream)),
+            result_of: Rc::new(self.result_of.back_graph(self.d(upstream))),
         }))
     }
     fn val(&self) -> f64 {
