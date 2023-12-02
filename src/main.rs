@@ -5,12 +5,14 @@ type DVal = f64;
 
 #[derive(Debug)]
 enum Num {
-    Res(Box<dyn Res>),
+    Res(Box<dyn Backable>),
     Param(f64),
 }
 
+type DNum = Num;
+
 impl Num {
-    fn rc_res(res: impl Res + 'static) -> Rc<Num> {
+    fn rc_res(res: impl Backable + 'static) -> Rc<Num> {
         Rc::new(Num::Res(Box::new(res)))
     }
 
@@ -28,16 +30,23 @@ impl Num {
     }
 }
 
-trait Res: Debug {
-    fn back(&self, upstream: f64) -> Vec<DVal>;
+trait Backable: Debug {
     fn val(&self) -> f64;
+    fn back_params(&self, upstream: f64) -> Vec<DVal>;
+    fn back_graph(&self, upstream: f64) -> DNum;
 }
 
-impl Res for Num {
-    fn back(&self, upstream: f64) -> Vec<DVal> {
+impl Backable for Num {
+    fn back_params(&self, upstream: f64) -> Vec<DVal> {
         match self {
-            Num::Res(res) => res.back(upstream),
+            Num::Res(res) => res.back_params(upstream),
             Num::Param(_) => vec![upstream],
+        }
+    }
+    fn back_graph(&self, upstream: f64) -> DNum {
+        match self {
+            Num::Res(res) => res.back_graph(upstream),
+            Num::Param(_) => DNum::Param(upstream),
         }
     }
     fn val(&self) -> f64 {
@@ -71,34 +80,70 @@ struct SqRes {
     result_of: Rc<Num>,
 }
 
-impl Res for AddRes {
-    fn back(&self, upstream: f64) -> Vec<DVal> {
+impl Backable for AddRes {
+    fn back_params(&self, upstream: f64) -> Vec<DVal> {
         self.result_of
             .iter()
-            .flat_map(|arg| arg.back(upstream))
+            .flat_map(|arg| arg.back_params(upstream))
             .collect()
     }
+    fn back_graph(&self, upstream: f64) -> DNum {
+        DNum::Res(Box::new(AddRes {
+            val: upstream,
+            result_of: self.result_of
+                .iter()
+                .map(|arg| {
+                    Rc::new(arg.back_graph(upstream)) // is this a sign that back_graph should just return `Rc`s? probably
+                })
+                .collect(),
+        }))
+    }
     fn val(&self) -> f64 {
         self.val
     }
 }
 
-impl Res for MulRes {
-    fn back(&self, upstream: f64) -> Vec<DVal> {
+impl Backable for MulRes {
+    fn back_params(&self, upstream: f64) -> Vec<DVal> {
         let a = &self.result_of.0;
         let b = &self.result_of.1;
-        let a_d = a.back(upstream * b.val());
-        let b_d = b.back(upstream * a.val());
+        let a_d = a.back_params(upstream * b.val());
+        let b_d = b.back_params(upstream * a.val());
         a_d.into_iter().chain(b_d).collect()
+    }
+    fn back_graph(&self, upstream: f64) -> DNum {
+        let a = &self.result_of.0;
+        let b = &self.result_of.1;
+
+        DNum::Res(Box::new(MulRes {
+            val: upstream,
+            result_of: (
+                Rc::new(a.back_graph(upstream * b.val())), // note reversal
+                Rc::new(b.back_graph(upstream * a.val())),
+            )
+        }))
     }
     fn val(&self) -> f64 {
         self.val
     }
 }
 
-impl Res for SqRes {
-    fn back(&self, upstream: f64) -> Vec<DVal> {
-        self.result_of.back(2. * self.val * upstream)
+
+impl  SqRes {
+    fn d(&self, upstream: f64) -> f64 {
+        2. * self.result_of.val() * upstream
+    }
+}
+
+impl Backable for SqRes {
+    fn back_params(&self, upstream: f64) -> Vec<DVal> {
+        self.result_of.back_params(self.d(upstream))
+    }
+    fn back_graph(&self, upstream: f64) -> DNum {
+        DNum::Res(Box::new(SqRes {
+            val: upstream,
+            result_of: Rc::new(self.result_of.back_graph(2. * self.result_of.val() * upstream)),
+        }))
     }
     fn val(&self) -> f64 {
         self.val
@@ -135,6 +180,12 @@ fn main() {
 
     let res2 = add(res1.clone(), c.clone());
 
-    let d_params = res2.back(1.);
+    let d_params = res2.back_params(1.);
     println!("{:?}", d_params);
+
+    let d_graph = res2.back_graph(1.);
+    println!("{:?}", d_graph);
 }
+
+// could probably create a BinaryOp Trait which is
+// differentiable and has an abstract fn d(self) -> (f64, f64)
