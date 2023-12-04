@@ -1,88 +1,60 @@
 use std::rc::Rc;
 
-use crate::node::{UnaryOpResult, Node, BinaryOpResult};
+use crate::node::{Node, BinaryOp, UnaryOp};
 
 #[derive(Debug)]
-struct AddRes {
-    val: f64,
-    result_of: (Rc<Node>, Rc<Node>),
-}
-
-#[derive(Debug)]
-struct MulRes {
-    val: f64,
-    result_of: (Rc<Node>, Rc<Node>),
-}
-
-#[derive(Debug)]
-struct SqRes {
-    val: f64,
-    result_of: Rc<Node>,
-}
-
-impl BinaryOpResult for AddRes {
-    fn get_args(&self) -> (Rc<Node>, Rc<Node>) {
-        self.result_of.clone()
-    }
-    fn get_grads(&self) -> (f64, f64) {
-        (1., 1.,)
+struct AddOp {}
+impl BinaryOp for AddOp {
+    fn get_grads(&self, _args: (f64, f64)) -> (f64, f64) {
+        (1., 1.)
     }
     fn op_name(&self) -> &'static str {
         "Add"
     }
-    fn val(&self) -> f64 {
-        self.val
-    }
 }
 
-impl BinaryOpResult for MulRes {
-    fn get_args(&self) -> (Rc<Node>, Rc<Node>) {
-        self.result_of.clone()
-    }
-    fn get_grads(&self) -> (f64, f64) {
-        (self.result_of.1.val(), self.result_of.0.val())
+#[derive(Debug)]
+struct MulOp {}
+impl BinaryOp for MulOp {
+    fn get_grads(&self, args: (f64, f64)) -> (f64, f64) {
+        (args.1, args.0)
     }
     fn op_name(&self) -> &'static str {
         "Mul"
     }
-    fn val(&self) -> f64 {
-        self.val
-    }
 }
 
-
-impl UnaryOpResult for SqRes {
-    fn get_arg(&self) -> Rc<Node> { self.result_of.clone()
-    }
-    fn get_grad(&self) -> f64 {
-        2. * self.result_of.val()
+#[derive(Debug)]
+struct SqrOp {}
+impl UnaryOp for SqrOp {
+    fn get_grads(&self, arg: f64) -> f64 {
+        2. * arg
     }
     fn op_name(&self) -> &'static str {
-        "Square"
-    }
-    fn val(&self) -> f64 {
-        self.val
+        "Sqr"
     }
 }
 
-
 pub fn add(a: Rc<Node>, b: Rc<Node>) -> Rc<Node> {
-    Node::bin_res(AddRes {
-        val: a.val() + b.val(),
-        result_of: (a, b),
-    })
+    Node::new_bin_res(
+        AddOp {},
+        (a.clone(), b.clone()),
+        a.val() + b.val(),
+    )
 }
 
 pub fn mul(a: Rc<Node>, b: Rc<Node>) -> Rc<Node> {
-    Node::bin_res(MulRes {
-        val: a.val() * b.val(),
-        result_of: (a, b),
-    })
+    Node::new_bin_res(
+        MulOp {},
+        (a.clone(), b.clone()),
+        a.val() * b.val(),
+    )
 }
 
 pub fn sq(x: Rc<Node>) -> Rc<Node> {
-    Node::unr_res(SqRes {
-        val: x.val() * x.val(),
-        result_of: x,
-    })
+    Node::new_unr_res(
+        SqrOp {},
+        x.clone(),
+        x.val() * x.val(),
+    )
 }
