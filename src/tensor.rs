@@ -5,7 +5,7 @@ use rand::Rng;
 pub struct Tensor {
     data: Vec<f64>,
     shape: Vec<usize>,
-    shape_postfix_product: Vec<usize>,
+    stride: Vec<usize>,
 }
 
 
@@ -29,7 +29,7 @@ impl Tensor {
         Tensor {
             shape: shape.clone(),
             data: vec![default; capacity],
-            shape_postfix_product: Tensor::get_postfix_prod(shape),
+            stride: Tensor::get_postfix_prod(shape),
         }
     }
 
@@ -43,7 +43,7 @@ impl Tensor {
     }
 
     fn flat_idx(&self, indices: &Vec<usize>) -> usize {
-        zip(indices, &self.shape_postfix_product)
+        zip(indices, &self.stride)
             .map(|(idx, prod)| idx * prod)
             .sum()
     }
@@ -78,8 +78,37 @@ impl Tensor {
         }
         out
     }
+
+    pub fn T(&self, dim_idx_1: usize, dim_idx_2: usize) -> Tensor {
+        let mut new_t = self.clone();
+
+        let dim_1 = new_t.shape[dim_idx_1];
+        new_t.shape[dim_idx_1] = new_t.shape[dim_idx_2];
+        new_t.shape[dim_idx_2] = dim_1;
+
+        let stride_1 = new_t.stride[dim_idx_1];
+        new_t.stride[dim_idx_1] = new_t.stride[dim_idx_2];
+        new_t.stride[dim_idx_2] = stride_1;
+
+        new_t
+    }
 }
 
 pub fn mmul(l: Tensor, r: Tensor) -> Tensor {
     l.matmul(r)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_t() {
+        let a = Tensor::rand(&vec![4, 4]);
+        let a_t = a.T(0, 1);
+        assert!(a.at(vec![2, 3]) == a_t.at(vec![3, 2]));
+    }
+}
+
+
+
