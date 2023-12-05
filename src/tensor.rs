@@ -11,6 +11,7 @@ pub struct Tensor {
 
 impl Tensor {
 
+
     fn get_postfix_prod(shape: &Vec<usize>) -> Vec<usize> {
         let l = shape.len();
         let mut out: Vec<usize> = vec![0;l];
@@ -21,6 +22,7 @@ impl Tensor {
         }
         out
     }
+
     pub fn zeroes(shape: &Vec<usize>) -> Tensor {
         let default = Default::default();
         let capacity = shape.iter().product();
@@ -30,6 +32,7 @@ impl Tensor {
             shape_postfix_product: Tensor::get_postfix_prod(shape),
         }
     }
+
     pub fn rand(shape: &Vec<usize>) -> Tensor {
         let mut rng = rand::thread_rng();
         let mut base = Tensor::zeroes(shape);
@@ -38,19 +41,23 @@ impl Tensor {
         }
         base
     }
+
     fn flat_idx(&self, indices: &Vec<usize>) -> usize {
         zip(indices, &self.shape_postfix_product)
             .map(|(idx, prod)| idx * prod)
             .sum()
     }
+
     pub fn at(&self, indices: Vec<usize>) -> f64 {
         let idx = self.flat_idx(&indices);
         self.data[idx]
     }
+
     pub fn at_mut(&mut self, indices: Vec<usize>) -> &mut f64 {
         let idx = self.flat_idx(&indices);
         self.data.get_mut(idx).unwrap()
     }
+
     pub fn matmul(self, rhs: Self) -> Tensor {
         assert!(self.shape.len() == 2 && rhs.shape.len() == 2);
         assert!(self.shape[1] == rhs.shape[0]);
