@@ -1,3 +1,4 @@
+mod tensor;
 mod ops;
 mod backward;
 mod node;
@@ -7,6 +8,7 @@ use std::iter::zip;
 use crate::ops::{add, mul, sq};
 use crate::node::Node;
 use crate::backward::accum_grads;
+use crate::tensor::{Tensor, mmul};
 
 fn model(params: &Vec<f64>) -> Vec<f64> {
     if params.len() != 3 { panic!() }
@@ -24,11 +26,18 @@ fn update(params: &Vec<f64>, grads: &Vec<f64>) -> Vec<f64> {
     zip(params, grads).map(|(p, g)| p - LR * g).collect()
 }
 
-fn main() {
+fn train() -> ! {
     let mut params = vec![2., 3., 4.];
     loop {
         let grads = model(&params);
         params = update(&params, &grads);
         println!("grads: {:#?}", grads);
     }
+}
+
+fn main() {
+    let l = Tensor::rand(&vec![2, 4000]);
+    let r = Tensor::rand(&vec![4000, 2]);
+    let out = mmul(l,r);
+    println!("{:#?}", out);
 }

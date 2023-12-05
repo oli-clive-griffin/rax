@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::node::{Node, BinaryOp, UnaryOp};
 
 #[derive(Debug)]
-struct AddOp {}
+struct AddOp;
 impl BinaryOp for AddOp {
     fn get_grads(&self, _args: (f64, f64)) -> (f64, f64) {
         (1., 1.)
@@ -14,7 +14,7 @@ impl BinaryOp for AddOp {
 }
 
 #[derive(Debug)]
-struct MulOp {}
+struct MulOp;
 impl BinaryOp for MulOp {
     fn get_grads(&self, args: (f64, f64)) -> (f64, f64) {
         (args.1, args.0)
@@ -25,7 +25,7 @@ impl BinaryOp for MulOp {
 }
 
 #[derive(Debug)]
-struct SqrOp {}
+struct SqrOp;
 impl UnaryOp for SqrOp {
     fn get_grads(&self, arg: f64) -> f64 {
         2. * arg
@@ -37,7 +37,7 @@ impl UnaryOp for SqrOp {
 
 pub fn add(a: Rc<Node>, b: Rc<Node>) -> Rc<Node> {
     Node::new_bin_res(
-        AddOp {},
+        AddOp,
         (a.clone(), b.clone()),
         a.val() + b.val(),
     )
@@ -45,7 +45,7 @@ pub fn add(a: Rc<Node>, b: Rc<Node>) -> Rc<Node> {
 
 pub fn mul(a: Rc<Node>, b: Rc<Node>) -> Rc<Node> {
     Node::new_bin_res(
-        MulOp {},
+        MulOp,
         (a.clone(), b.clone()),
         a.val() * b.val(),
     )
@@ -53,7 +53,7 @@ pub fn mul(a: Rc<Node>, b: Rc<Node>) -> Rc<Node> {
 
 pub fn sq(x: Rc<Node>) -> Rc<Node> {
     Node::new_unr_res(
-        SqrOp {},
+        SqrOp,
         x.clone(),
         x.val() * x.val(),
     )
