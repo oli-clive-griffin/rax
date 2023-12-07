@@ -1,3 +1,4 @@
+#![allow(unused)]
 mod tensor;
 mod ops;
 mod backward;
