@@ -5,6 +5,8 @@ mod backward;
 mod node;
 
 use std::iter::zip;
+use std::thread::sleep;
+use std::time::Duration;
 
 use crate::ops::{add, mul, sq};
 use crate::node::Node;
@@ -17,7 +19,9 @@ fn model(params: &Vec<f64>) -> Vec<f64> {
     let b = Node::param(params[1], "b");
     let c = Node::param(params[2], "c");
     let expr = mul(add(mul(a.clone(), b.clone()), sq(c.clone())), c.clone());
+    println!("{:#?}", expr);
     let backward_graph = expr.back(1.);
+    println!("{:#?}", backward_graph);
     let grads_map = accum_grads(backward_graph);
     return grads_map.values().map(|x| x.clone()).collect();
 }
@@ -32,13 +36,15 @@ fn train() -> ! {
     loop {
         let grads = model(&params);
         params = update(&params, &grads);
-        println!("grads: {:#?}", grads);
+        // println!("grads: {:#?}", grads);
+        sleep(Duration::from_millis(300));
     }
 }
 
 fn main() {
-    let l = Tensor::rand(&vec![2, 4000]);
-    let r = Tensor::rand(&vec![4000, 2]);
-    let out = mmul(l,r);
-    println!("{:#?}", out);
+    train()
+    // let l = Tensor::rand(&vec![2, 4000]);
+    // let r = Tensor::rand(&vec![4000, 2]);
+    // let out = mmul(l,r);
+    // println!("{:#?}", out);
 }

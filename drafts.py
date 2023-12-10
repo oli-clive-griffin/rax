@@ -21,7 +21,7 @@ indices = [0, 1]
 element = get_element(my_list, indices)
 
 
-def add(a, ashape, b, bshape, out, outshape):
+def add(l, ashape, r, bshape, out, outshape):
     stack = []
 
     def getIdx(shape):
@@ -29,8 +29,8 @@ def add(a, ashape, b, bshape, out, outshape):
 
     def nested_loop(depth: int):
         if depth == 3:
-            res = get_element(a, getIdx(ashape))\
-                + get_element(b, getIdx(bshape))
+            res = get_element(l, getIdx(ashape))\
+                + get_element(r, getIdx(bshape))
             set_element(
                 out,
                 stack,
@@ -45,7 +45,52 @@ def add(a, ashape, b, bshape, out, outshape):
 
     nested_loop(0)
 
-a = [[[1],
+def add2(l, r, out, dirs):
+    stack = []
+
+    def getIndices() -> tuple[list[int], list[int]]:
+        l = []
+        r = []
+        for broadcastdir, idx in zip(dirs, stack):
+            match broadcastdir:
+                case 'ltr':
+                    l.append(0)
+                    r.append(idx)
+                case 'rtl':
+                    l.append(idx)
+                    r.append(0)
+                case None:
+                    l.append(idx)
+                    r.append(idx)
+                case _:
+                    raise ValueError(f'huh?, got {broadcastdir=}')
+        return l, r
+
+    def nested_loop(depth: int):
+        if depth == 3:
+            l_idx, r_idx = getIndices()
+            res = None
+            try:
+                res = get_element(l, l_idx) + get_element(r, r_idx)
+            except:
+                breakpoint()
+
+            set_element(
+                out,
+                stack,
+                res
+            )
+            return
+
+        for i in range(outshape[depth]):
+            stack.append(i)
+            nested_loop(depth+1)
+            stack.pop()
+
+    nested_loop(0)
+
+
+l = [[[1],
       [2],
       [3],
       [1]],
@@ -53,13 +98,13 @@ a = [[[1],
       [3],
       [9],
       [2]]]
-ashape = [2, 4, 1]
+lshape = [2, 4, 1]
 
-b = [[[1, 2, 5],
+r = [[[1, 2, 5],
       [1, 2, 2],
       [2, 2, 5],
       [7, 2, 3]]]
-bshape = [1, 4, 3]
+rshape = [1, 4, 3]
 
 empty = [[[None, None, None],
           [None, None, None],
@@ -69,18 +114,16 @@ empty = [[[None, None, None],
           [None, None, None],
           [None, None, None],
           [None, None, None]]]
-shape = [2, 4, 3]
+outshape = [2, 4, 3]
+out = copy.deepcopy(empty)
+out2 = copy.deepcopy(empty)
 
-add(a, ashape, b, bshape, empty, shape)
+add(l, lshape, r, rshape, out, outshape)
+print(out)
 
-print(empty)
-
-
-
-
-
-
-
+broadcast_dirs = ['rtl', None, 'ltr']
+add2(l, r, out2, broadcast_dirs)
+print(out2)
 
 
 
@@ -96,12 +139,21 @@ print(empty)
 
 
 
-# a = [
+
+
+
+
+
+
+
+
+
+# l = [
 #     [1, 2, 2],
 # ]
 # a_shape = [1, 3]
 
-# b = [
+# r = [
 #     [1, 1, 1],
 #     [1, 1, 1],
 #     [1, 1, 1],
