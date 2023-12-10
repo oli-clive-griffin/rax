@@ -1,8 +1,6 @@
 use std::{
     iter::zip,
-    ops::Add,
     vec,
-    error::Error,
     fmt::{
         Debug,
         Write,
@@ -47,9 +45,7 @@ impl VecTensor {
         let idx = self.flat_idx(indices);
         self.data.get_mut(idx).unwrap()
     }
-
 }
-
 
 impl Tensor {
     fn unsqueeze(&self, dim_index: usize) -> Tensor {
