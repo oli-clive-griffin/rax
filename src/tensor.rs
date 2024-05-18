@@ -1,13 +1,10 @@
-use std::{
-    iter::zip,
-    vec,
-    fmt::{
-        Debug,
-        Write,
-    },
-    rc::Rc,
-};
 use rand::Rng;
+use std::{
+    fmt::{Debug, Write},
+    iter::zip,
+    rc::Rc,
+    vec,
+};
 
 #[derive(Clone)]
 pub struct Tensor {
@@ -71,7 +68,12 @@ impl Tensor {
 // TODO clean this up
 impl Debug for Tensor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn nested_loop(t: &Tensor, idx_stack: &mut Vec<usize>, f: &mut std::fmt::Formatter, indent: u8) {
+        fn nested_loop(
+            t: &Tensor,
+            idx_stack: &mut Vec<usize>,
+            f: &mut std::fmt::Formatter,
+            indent: u8,
+        ) {
             let depth = idx_stack.len();
             let full_depth = t.shape.len();
             let is_leaf = depth == full_depth;
@@ -79,7 +81,8 @@ impl Debug for Tensor {
             if is_leaf {
                 f.write_str(&format!("{}", &t.at(idx_stack).to_string()));
 
-                let isnt_last_val = *idx_stack.last().unwrap_or(&0) != t.shape.last().unwrap_or(&0)-1;
+                let isnt_last_val =
+                    *idx_stack.last().unwrap_or(&0) != t.shape.last().unwrap_or(&0) - 1;
 
                 if isnt_last_val {
                     f.write_str(", ");
@@ -131,13 +134,13 @@ trait Indexable: Stridable {
 
 impl Stridable for Tensor {
     fn get_stride(&self) -> &Vec<usize> {
-        return &self.stride
+        return &self.stride;
     }
 }
 
 impl Stridable for VecTensor {
     fn get_stride(&self) -> &Vec<usize> {
-        return &self.stride
+        return &self.stride;
     }
 }
 
@@ -147,7 +150,7 @@ impl Indexable for VecTensor {}
 impl Tensor {
     fn get_postfix_prod(shape: &Vec<usize>) -> Vec<usize> {
         let l = shape.len();
-        let mut out: Vec<usize> = vec![0;l];
+        let mut out: Vec<usize> = vec![0; l];
         let mut n = 1;
         for i in (0..l).rev() {
             out[i] = n;
@@ -215,21 +218,39 @@ enum BroadcastDir {
     RTL, // right broadcasts to left,
 }
 fn broadcastable(shape_l: Vec<usize>, shape_r: Vec<usize>) -> Option<Vec<BroadcastDir>> {
-    let l = if shape_l.len() > shape_r.len() { shape_l.len() } else { shape_r.len() };
+    let l = if shape_l.len() > shape_r.len() {
+        shape_l.len()
+    } else {
+        shape_r.len()
+    };
     let shape_l_len = shape_l.len();
     let shape_r_len = shape_r.len();
 
     let mut out: Vec<BroadcastDir> = vec![];
 
     for i in 1..=l {
-        let dim_l = if i <= shape_l_len { shape_l[shape_l_len - i] } else { 1 };
-        let dim_r = if i <= shape_r_len { shape_r[shape_r_len - i] } else { 1 };
+        let dim_l = if i <= shape_l_len {
+            shape_l[shape_l_len - i]
+        } else {
+            1
+        };
+        let dim_r = if i <= shape_r_len {
+            shape_r[shape_r_len - i]
+        } else {
+            1
+        };
 
         let broadcast_dir = match (dim_l, dim_r) {
             (1, 1) => BroadcastDir::UnNeeded,
             (1, _) => BroadcastDir::LTR,
             (_, 1) => BroadcastDir::RTL,
-            (_, _) => if dim_l == dim_r { BroadcastDir::UnNeeded } else { return None },
+            (_, _) => {
+                if dim_l == dim_r {
+                    BroadcastDir::UnNeeded
+                } else {
+                    return None;
+                }
+            }
         };
 
         out.push(broadcast_dir);
@@ -297,8 +318,16 @@ fn elementwise_broadcasted_map(
             // dimension, push `0` onto the appropriate
             // stack so that the pointer stays pointing
             // at index 0 for that dimension
-            r_stack.push(if broadcast_direction_for_depth == &BroadcastDir::RTL { 0 } else { dim_idx });
-            l_stack.push(if broadcast_direction_for_depth == &BroadcastDir::LTR { 0 } else { dim_idx });
+            r_stack.push(if broadcast_direction_for_depth == &BroadcastDir::RTL {
+                0
+            } else {
+                dim_idx
+            });
+            l_stack.push(if broadcast_direction_for_depth == &BroadcastDir::LTR {
+                0
+            } else {
+                dim_idx
+            });
 
             inner(r, r_stack, l, l_stack, out, out_stack, broadcast_dirs, func);
 
@@ -323,31 +352,32 @@ fn elementwise_broadcasted_map(
 }
 
 pub fn add(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| { a + b })
+    elementwise_broadcasted_map(&r, &l, &|a, b| a + b)
 }
 
 pub fn mul(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| { a * b })
+    elementwise_broadcasted_map(&r, &l, &|a, b| a * b)
 }
 
 pub fn sub(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| { a - b })
+    elementwise_broadcasted_map(&r, &l, &|a, b| a - b)
 }
 
 pub fn div(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| { a / b })
+    elementwise_broadcasted_map(&r, &l, &|a, b| a / b)
 }
 
 fn elemwise_max(l: &Tensor, r: &Tensor) -> Vec<usize> {
-    zip(&l.shape, &r.shape)
-        .map(|(a, b)| { max(*a, *b) })
-        .collect()
+    zip(&l.shape, &r.shape).map(|(a, b)| max(*a, *b)).collect()
 }
 
 fn max(a: usize, b: usize) -> usize {
-    if a > b { a } else { b }
+    if a > b {
+        a
+    } else {
+        b
+    }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -411,7 +441,7 @@ mod tests {
     #[test]
     fn test_broadcasting_6() {
         let shape_l: Vec<usize> = vec![2, 1, 2, 1];
-        let shape_r: Vec<usize> = vec![   1, 1, 3];
+        let shape_r: Vec<usize> = vec![1, 1, 3];
         let expected = vec![
             BroadcastDir::RTL,
             BroadcastDir::UnNeeded,
@@ -445,9 +475,9 @@ mod tests {
     #[test]
     fn test_display() {
         let md = Tensor {
-            data: Rc::new((0..24).map(|i| { i as f64}).collect::<Vec<f64>>()),
+            data: Rc::new((0..24).map(|i| i as f64).collect::<Vec<f64>>()),
             shape: vec![4, 2, 3],
-            stride: Tensor::get_postfix_prod(&vec![4, 2, 3])
+            stride: Tensor::get_postfix_prod(&vec![4, 2, 3]),
         };
         println!("{:?}", md);
     }

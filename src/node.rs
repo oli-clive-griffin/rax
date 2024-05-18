@@ -1,11 +1,24 @@
 use std::fmt::Debug;
 use std::rc::Rc;
 
+#[derive(Debug, Clone)]
+// pub struct Param(pub f64, pub &'static str);
+pub struct Param {
+    pub val: f64,
+    pub name: &'static str,
+}
+
+impl Param {
+    pub fn new(val: f64, name: &'static str) -> Self {
+        Self { val, name }
+    }
+}
+
 #[derive(Debug)]
 pub enum Node {
     BinaryOpResult(BinaryOpResult),
     UnaryOpResult(UnaryOpResult),
-    Param(f64, &'static str),
+    Param(Param),
 }
 
 #[derive(Debug)]
@@ -34,22 +47,30 @@ pub trait UnaryOp: Debug {
 
 impl Node {
     pub fn new_unr_res(op: impl UnaryOp + 'static, arg: Rc<Node>, value: f64) -> Rc<Node> {
-        Rc::new(Node::UnaryOpResult(UnaryOpResult { op: Box::new(op), arg, value }))
+        Rc::new(Node::UnaryOpResult(UnaryOpResult {
+            op: Box::new(op),
+            arg,
+            value,
+        }))
     }
 
-    pub fn new_bin_res(op: impl BinaryOp + 'static, args: (Rc<Node>, Rc<Node>), value: f64) -> Rc<Node> {
-        Rc::new(Node::BinaryOpResult(BinaryOpResult { op: Box::new(op), args, value }))
-    }
-
-    pub fn param(val: f64, name: &'static str) -> Rc<Node> {
-        Rc::new(Node::Param(val, name))
+    pub fn new_bin_res(
+        op: impl BinaryOp + 'static,
+        args: (Rc<Node>, Rc<Node>),
+        value: f64,
+    ) -> Rc<Node> {
+        Rc::new(Node::BinaryOpResult(BinaryOpResult {
+            op: Box::new(op),
+            args,
+            value,
+        }))
     }
 
     pub fn val(&self) -> f64 {
         match self {
             Node::BinaryOpResult(res) => res.value,
             Node::UnaryOpResult(res) => res.value,
-            Node::Param(val, _name) => *val,
+            Node::Param(Param { val, name: _ }) => *val,
         }
     }
 }
