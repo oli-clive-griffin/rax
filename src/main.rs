@@ -14,8 +14,6 @@ use crate::backward::accum_grads;
 use crate::node::Node;
 use crate::ops::{add, mul, sq};
 use crate::optimizer::{Optimizer, SGD};
-use crate::tensor::{mmul, Tensor};
-// use crate::tensor::{mmul, Tensor};
 
 type ParamMap = HashMap<String, Param>;
 
@@ -50,8 +48,5 @@ fn train() {
 }
 
 fn main() {
-    let l = Tensor::rand(&vec![5, 30]);
-    let r = Tensor::rand(&vec![30, 5]);
-    let out = mmul(&l, &r);
-    println!("{:#?}", out);
+    train();
 }
