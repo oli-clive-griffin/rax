@@ -14,6 +14,6 @@ impl Optimizer for SGD {
             let grad = grads.get(*name).unwrap();
             *val -= self.lr * grad;
         }
-        return params;
+        params
     }
 }

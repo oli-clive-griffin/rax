@@ -1,5 +1,5 @@
 use crate::node::{BinaryOpResult, Node, Param, UnaryOpResult};
-use std::{collections::HashMap, ptr};
+use std::{collections::HashMap};
 
 #[derive(Debug)]
 pub struct BinOpTrace {
@@ -55,23 +55,23 @@ impl Node {
 impl BinaryOpResult {
     fn back(&self, upstream: f64) -> DTrace {
         let (g1, g2) = self.op.get_grads((self.args.0.val(), self.args.1.val()));
-        return DTrace::BinOp(BinOpTrace {
+        DTrace::BinOp(BinOpTrace {
             arg1: Box::new(self.args.0.back_impl(g1 * upstream)),
             arg2: Box::new(self.args.1.back_impl(g2 * upstream)),
             _op_name: self.op.op_name(),
             _original_val: self.value,
-        });
+        })
     }
 }
 
 impl UnaryOpResult {
     fn back(&self, upstream: f64) -> DTrace {
         let g = self.op.get_grads(self.arg.val());
-        return DTrace::UnaryOp(UnaryOpTrace {
+        DTrace::UnaryOp(UnaryOpTrace {
             arg: Box::new(self.arg.back_impl(g * upstream)),
             _op_name: self.op.op_name(),
             _original_val: self.value,
-        });
+        })
     }
 }
 

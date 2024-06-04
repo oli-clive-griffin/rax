@@ -79,25 +79,25 @@ impl Debug for Tensor {
             let is_leaf = depth == full_depth;
 
             if is_leaf {
-                f.write_str(&format!("{}", &t.at(idx_stack).to_string()));
+                f.write_str(&t.at(idx_stack).to_string().to_string()).unwrap();
 
                 let isnt_last_val =
                     *idx_stack.last().unwrap_or(&0) != t.shape.last().unwrap_or(&0) - 1;
 
                 if isnt_last_val {
-                    f.write_str(", ");
+                    f.write_str(", ").unwrap();
                 }
 
                 return;
             } else {
-                f.write_str("\n");
+                f.write_str("\n").unwrap();
             }
 
-            for i in 0..indent {
-                f.write_char(' ');
+            for _i in 0..indent {
+                f.write_char(' ').unwrap();
             }
 
-            f.write_str("[");
+            f.write_str("[").unwrap();
             for dim_idx in 0..t.shape[depth] {
                 idx_stack.push(dim_idx);
                 nested_loop(t, idx_stack, f, indent + 2);
@@ -105,13 +105,13 @@ impl Debug for Tensor {
             }
 
             if depth != full_depth - 1 {
-                f.write_str("\n");
-                for i in 0..indent {
-                    f.write_char(' ');
+                f.write_str("\n").unwrap();
+                for _i in 0..indent {
+                    f.write_char(' ').unwrap();
                 }
             }
 
-            f.write_str("],");
+            f.write_str("],").unwrap();
         }
 
         let mut idx_stack: Vec<usize> = vec![];
@@ -134,13 +134,13 @@ trait Indexable: Stridable {
 
 impl Stridable for Tensor {
     fn get_stride(&self) -> &Vec<usize> {
-        return &self.stride;
+        &self.stride
     }
 }
 
 impl Stridable for VecTensor {
     fn get_stride(&self) -> &Vec<usize> {
-        return &self.stride;
+        &self.stride
     }
 }
 
@@ -199,13 +199,9 @@ impl Tensor {
     pub fn transpose(&self, dim_idx_1: usize, dim_idx_2: usize) -> Tensor {
         let mut new_t = self.clone();
 
-        let dim_1 = new_t.shape[dim_idx_1];
-        new_t.shape[dim_idx_1] = new_t.shape[dim_idx_2];
-        new_t.shape[dim_idx_2] = dim_1;
+        new_t.shape.swap(dim_idx_1, dim_idx_2);
 
-        let stride_1 = new_t.stride[dim_idx_1];
-        new_t.stride[dim_idx_1] = new_t.stride[dim_idx_2];
-        new_t.stride[dim_idx_2] = stride_1;
+        new_t.stride.swap(dim_idx_1, dim_idx_2);
 
         new_t
     }
@@ -352,19 +348,19 @@ fn elementwise_broadcasted_map(
 }
 
 pub fn add(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a + b)
+    elementwise_broadcasted_map(r, l, &|a, b| a + b)
 }
 
 pub fn mul(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a * b)
+    elementwise_broadcasted_map(r, l, &|a, b| a * b)
 }
 
 pub fn sub(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a - b)
+    elementwise_broadcasted_map(r, l, &|a, b| a - b)
 }
 
 pub fn div(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a / b)
+    elementwise_broadcasted_map(r, l, &|a, b| a / b)
 }
 
 fn elemwise_max(l: &Tensor, r: &Tensor) -> Vec<usize> {
