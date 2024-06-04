@@ -1,3 +1,5 @@
+use std::collections::hash_map::ValuesMut;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -11,6 +13,19 @@ pub struct Param {
 impl Param {
     pub fn new(val: f64, name: &'static str) -> Self {
         Self { val, name }
+    }
+}
+
+pub struct Params(HashMap<String, Param>);
+
+impl Params {
+    fn new<I: IntoIterator<Item = Param>>(params: I) -> Self {
+        let hashmap = HashMap::from_iter(params.into_iter().map(|param| (param.name.to_string(), param)));
+        Self(hashmap)
+    }
+
+    pub fn values_mut(&mut self) -> ValuesMut<'_, String, Param> {
+        self.0.values_mut()
     }
 }
 

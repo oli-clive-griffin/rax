@@ -1,7 +1,7 @@
-use crate::{backward::GradMap, node::Param, ParamMap};
+use crate::{backward::GradMap, node::{Param, Params}};
 
 pub trait Optimizer {
-    fn update(&self, params: ParamMap, grads: GradMap) -> ParamMap;
+    fn update(&self, params: Params, grads: GradMap) -> Params;
 }
 
 pub struct SGD {
@@ -9,7 +9,7 @@ pub struct SGD {
 }
 
 impl Optimizer for SGD {
-    fn update(&self, mut params: ParamMap, grads: GradMap) -> ParamMap {
+    fn update(&self, mut params: Params, grads: GradMap) -> Params {
         for Param { val, name } in params.values_mut() {
             let grad = grads.get(*name).unwrap();
             *val -= self.lr * grad;
