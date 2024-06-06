@@ -1,22 +1,24 @@
-use crate::{node::{BinaryOpResult, Node, ReduceOpResult, UnaryOpResult}, tensor::{self, Tensor}};
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
+
+use crate::node::{BinaryOpResult, Node, ReduceOpResult, UnaryOpResult};
+use crate::tensor::Tensor;
 
 #[derive(Debug)]
 pub struct BinOpTrace {
     arg1: Box<DTrace>,
     arg2: Box<DTrace>,
-    op_name: &'static str,
+    name: &'static str,
 }
 
 #[derive(Debug)]
 pub struct UnaryOpTrace {
     arg: Box<DTrace>,
-    op_name: &'static str,
+    name: &'static str,
 }
 
 #[derive(Debug)]
 pub struct DParamDX {
-    d_val: Tensor,
+    d_val: Rc<Tensor>,
     param_name: &'static str,
 }
 
@@ -29,47 +31,51 @@ pub enum DTrace {
 
 impl Node {
     pub fn backwards(&self) -> DTrace {
-        self.back_impl(&Tensor::from(1.))
+        self.back_impl(Rc::new(Tensor::from(1.)))
     }
 
-    pub fn back_impl(&self, upstream: &Tensor) -> DTrace {
+    pub fn back_impl(&self, upstream: Rc<Tensor>) -> DTrace {
         match self {
             Node::BinaryOp(res) => res.back(upstream),
             Node::UnaryOp(res) => res.back(upstream),
             Node::ReduceOp(res) => res.back(upstream),
-            Node::TensorParam(_t, name) => {
-                DTrace::DParamDX(DParamDX {
-                    d_val: upstream.clone(),
-                    param_name: name
-                })
-            }
+            Node::TensorParam(_t, name) => DTrace::DParamDX(DParamDX {
+                d_val: upstream.clone(),
+                param_name: name,
+            }),
         }
     }
 }
 
 impl BinaryOpResult {
-    fn back(&self, upstream: &Tensor) -> DTrace {
-        let (g1, g2) = self.op.get_grads(upstream, (&self.args.0.val(), &self.args.1.val()));
+    fn back(&self, upstream: Rc<Tensor>) -> DTrace {
+        let (g1, g2) = self.op.get_grads(
+            upstream,
+            (Rc::new(self.args.0.val()), Rc::new(self.args.1.val())),
+        );
         DTrace::BinOp(BinOpTrace {
-            arg1: Box::new(self.args.0.back_impl(&g1)),
-            arg2: Box::new(self.args.1.back_impl(&g2)),
-            op_name: self.op.op_name(),
+            arg1: Box::new(self.args.0.back_impl(g1)),
+            arg2: Box::new(self.args.1.back_impl(g2)),
+            name: self.op.name(),
         })
     }
 }
 
 impl UnaryOpResult {
-    fn back(&self, upstream: &Tensor) -> DTrace {
-        let g = self.op.get_grads(upstream, &self.arg.val());
+    fn back(&self, upstream: Rc<Tensor>) -> DTrace {
+        let g = self.op.get_grads(upstream.clone(), Rc::new(self.arg.val()));
         DTrace::UnaryOp(UnaryOpTrace {
-            arg: Box::new(self.arg.back_impl(&tensor::mul(&g, upstream).unwrap())),
-            op_name: self.op.op_name(),
+            arg: Box::new(
+                self.arg
+                    .back_impl(Rc::new(Tensor::mul(&g, &upstream).unwrap())),
+            ),
+            name: self.op.name(),
         })
     }
 }
 
 impl ReduceOpResult {
-    fn back(&self, _upstream: &Tensor) -> DTrace {
+    fn back(&self, _upstream: Rc<Tensor>) -> DTrace {
         todo!()
     }
 }
@@ -90,10 +96,15 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
         }
         DTrace::UnaryOp(op) => _accum_grads(&op.arg, map),
         DTrace::DParamDX(param) => {
-            // I'm realllly not sure this is right at all
-            let current_value = map.entry(param.param_name.to_string()).or_insert(Tensor::from(0.));
-            let res = tensor::add(current_value, &param.d_val).unwrap_or_else(|_| {
-                panic!("could not add tensors with shapes {:?} and {:?}", current_value.size(), param.d_val.size())
+            let current_value = map
+                .entry(param.param_name.to_string())
+                .or_insert(Tensor::from(0.));
+            let res = Tensor::add(current_value, &param.d_val).unwrap_or_else(|_| {
+                panic!(
+                    "could not add tensors with shapes {:?} and {:?}",
+                    current_value.size(),
+                    param.d_val.size()
+                )
             });
             *current_value = res
         }

@@ -1,16 +1,7 @@
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 
 use crate::tensor::Tensor;
-
-#[derive(Debug)]
-pub struct ParamsMap(pub HashMap<String, Tensor>);
-impl ParamsMap {
-    pub fn new() -> Self {
-        ParamsMap(HashMap::new())
-    }
-}
 
 #[derive(Debug)]
 pub enum Node {
@@ -42,18 +33,19 @@ pub struct ReduceOpResult {
 }
 
 pub trait BinaryOp: Debug {
-    fn get_grads(&self, upstream: &Tensor, args: (&Tensor, &Tensor)) -> (Tensor, Tensor);
-    fn op_name(&self) -> &'static str;
+    fn name(&self) -> &'static str;
+    fn get_grads(&self, upstream: Rc<Tensor>, args: (Rc<Tensor>, Rc<Tensor>)) -> (Rc<Tensor>, Rc<Tensor>);
+    fn forward(&self, left: Rc<Tensor>, right: Rc<Tensor>) -> Tensor;
 }
 
 pub trait UnaryOp: Debug {
-    fn get_grads(&self, upstream: &Tensor, arg: &Tensor) -> Tensor;
-    fn op_name(&self) -> &'static str;
+    fn get_grads(&self, upstream: Rc<Tensor>, arg: Rc<Tensor>) -> Rc<Tensor>;
+    fn name(&self) -> &'static str;
 }
 
 pub trait ReduceOp: Debug {
-    fn get_grads(&self, arg: &Tensor) -> Tensor;
-    fn op_name(&self) -> &'static str;
+    fn get_grads(&self, arg: Rc<Tensor>) -> Rc<Tensor>;
+    fn name(&self) -> &'static str;
 }
 
 impl Node {
@@ -67,13 +59,13 @@ impl Node {
 
     pub fn new_bin_res(
         op: impl BinaryOp + 'static,
-        args: (Rc<Node>, Rc<Node>),
-        value: Tensor,
+        l: Rc<Node>,
+        r: Rc<Node>, 
     ) -> Rc<Node> {
         Rc::new(Node::BinaryOp(BinaryOpResult {
+            args: (l.clone(), r.clone()),
+            value: op.forward(Rc::new(l.val()), Rc::new(r.val())),
             op: Box::new(op),
-            args,
-            value,
         }))
     }
 

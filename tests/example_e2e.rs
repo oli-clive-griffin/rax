@@ -1,7 +1,7 @@
 use rusty_grad::backward::{accum_grads, GradMap};
-use rusty_grad::node::{Node, ParamsMap};
-use rusty_grad::ops::{add, mmul, relu, sqr, sub};
-use rusty_grad::optimizer::{Optimizer, SGD};
+use rusty_grad::node::Node;
+use rusty_grad::ops::{add, mul, mmul, relu, sqr, sub};
+use rusty_grad::optimizer::{Optimizer, ParamsMap, SGD};
 use rusty_grad::tensor::Tensor;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -31,17 +31,21 @@ fn test_train() {
         let x3 = relu(add(mmul(x2, w3), b3));
         // println!("x3: {:?}", x3.val()); // print the tensor, not the node + subtree
 
+        if x3.val().item().unwrap() - 0.01 < 1e-3 {
+            println!("x3: {:.4}", x3.val().item().unwrap());
+        }
+
         return x3;
     }
 
-    fn forward(params: &ParamsMap, x: Tensor, y: Tensor) -> (Tensor, GradMap) {
-        let label = Rc::new(Node::TensorParam(y, "label"));
-        let out = model(params, x);
+    fn forward(params: &ParamsMap, input: Tensor, label: Tensor) -> (Tensor, GradMap) {
+        let label = Rc::new(Node::TensorParam(label, "label"));
+        let out = model(params, input);
 
         // let loss = mean(sq(sub(act3, label)));
         let loss = sqr(sub(out.clone(), label.clone()));
-        // println!("out: {:?}, label: {:?}", out.val(), label.val());
-        println!("loss: {:?}", loss.val()); // print the tensor, not the node + subtree
+        // println!("out: {:?}, label: {:?}", out.val().item().unwrap(), label.val().item().unwrap());
+        // println!("loss: {:?}", loss.val().item().unwrap()); // print the tensor, not the node + subtree
 
         let graph = loss.backwards();
         let grads_map = accum_grads(graph);
@@ -67,6 +71,59 @@ fn test_train() {
         loop {
             let (loss, grads_map) = forward(&params, x.clone(), y.clone());
             params = optim.update(params, grads_map);
+            sleep(Duration::from_millis(50));
+            if loss.item().unwrap() < 1e-6 {
+                break;
+            }
+        }
+
+        return params;
+    }
+
+    println!("Training model...");
+    let params = train_model();
+    println!("{:?}", params);
+}
+
+
+
+#[test]
+fn test__train_simple() {
+    // a dead simple MLP. the model is a pure forward pass function,
+    // without having to worry about stateful parameter handling.
+    fn model(params: &ParamsMap) -> Rc<Node> {
+        let w1 = Rc::new(Node::TensorParam(params.0.get("w1").unwrap().clone(), "w1"));
+        let w2 = Rc::new(Node::TensorParam(params.0.get("w2").unwrap().clone(), "w2"));
+
+        add(w1, w2)
+    }
+
+    fn forward(params: &ParamsMap) -> (Tensor, GradMap) {
+        let out = model(params);
+        let graph = out.backwards();
+        let grads_map = accum_grads(graph);
+        (out.val(), grads_map)
+    }
+
+    fn train_model() -> ParamsMap {
+        let mut params = ParamsMap(HashMap::from([
+            ("w1".to_string(), Tensor::rand(&vec![1])),
+            ("w2".to_string(), Tensor::rand(&vec![1])),
+        ]));
+
+        let optim = SGD::default();
+
+        loop {
+            let (loss, grads_map) = forward(&params);
+            println!(
+                "params: {:#?}, grads: {:#?}",
+                params, grads_map, 
+            );
+            let new_params = optim.update(params, grads_map);
+            println!("new_params: {:?}", new_params);
+            params = new_params;
+            println!("loss: {}", loss.item().unwrap());
+            println!("\n-------------------\n");
             sleep(Duration::from_millis(50));
             if loss.item().unwrap() < 1e-6 {
                 break;

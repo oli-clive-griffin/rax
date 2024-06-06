@@ -1,46 +1,53 @@
 use std::rc::Rc;
 
-use crate::{
-    node::{BinaryOp, Node, ReduceOp, UnaryOp},
-    tensor::{self, Tensor},
-};
+use crate::node::{BinaryOp, Node, ReduceOp, UnaryOp};
+use crate::tensor::Tensor;
 
 #[derive(Debug)]
 pub struct MMulOp;
 impl BinaryOp for MMulOp {
-    fn get_grads(&self, upstream: &Tensor, (l, r): (&Tensor, &Tensor)) -> (Tensor, Tensor) {
-        let l_grad = tensor::mmul(upstream, &r.transpose(0, 1));
-        let r_grad = tensor::mmul(&l.transpose(0, 1), upstream);
-        (l_grad, r_grad)
+    fn get_grads(&self, upstream: Rc<Tensor>, (l, r): (Rc<Tensor>, Rc<Tensor>)) -> (Rc<Tensor>, Rc<Tensor>) {
+        let l_grad = Tensor::mmul(&upstream, &r.transpose(0, 1));
+        let r_grad = Tensor::mmul(&l.transpose(0, 1), &upstream);
+        (Rc::new(l_grad), Rc::new(r_grad))
     }
 
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "MatMul"
+    }
+    fn forward(&self, left: Rc<Tensor>, right: Rc<Tensor>) -> Tensor {
+        Tensor::mmul(&left, &right)
     }
 }
 
 #[derive(Debug)]
 pub struct AddOp;
 impl BinaryOp for AddOp {
-    fn get_grads(&self, upstream: &Tensor, _args: (&Tensor, &Tensor)) -> (Tensor, Tensor) {
+    fn get_grads(&self, upstream: Rc<Tensor>, _args: (Rc<Tensor>, Rc<Tensor>)) -> (Rc<Tensor>, Rc<Tensor>) {
         (upstream.clone(), upstream.clone())
     }
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "Add"
+    }
+    fn forward(&self, left: Rc<Tensor>, right: Rc<Tensor>) -> Tensor {
+        Tensor::add(&left, &right).unwrap()
     }
 }
 
 #[derive(Debug)]
 pub struct SubOp;
 impl BinaryOp for SubOp {
-    fn get_grads(&self, upstream: &Tensor, _args: (&Tensor, &Tensor)) -> (Tensor, Tensor) {
+    fn get_grads(&self, upstream: Rc<Tensor>, _args: (Rc<Tensor>, Rc<Tensor>)) -> (Rc<Tensor>, Rc<Tensor>) {
         (
             upstream.clone(),
-            tensor::mul(&upstream.clone(), &Tensor::from(-1.)).unwrap(),
+            Rc::new(Tensor::mul(&upstream.clone(), &Tensor::from(-1.)).unwrap()),
         )
     }
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "Sub"
+    }
+    fn forward(&self, left: Rc<Tensor>, right: Rc<Tensor>) -> Tensor {
+        Tensor::sub(&left, &right).unwrap()
     }
 }
 
@@ -48,25 +55,28 @@ impl BinaryOp for SubOp {
 
 pub struct MulOp;
 impl BinaryOp for MulOp {
-    fn get_grads(&self, upstream: &Tensor, (l, r): (&Tensor, &Tensor)) -> (Tensor, Tensor) {
+    fn get_grads(&self, upstream: Rc<Tensor>, (l, r): (Rc<Tensor>, Rc<Tensor>)) -> (Rc<Tensor>, Rc<Tensor>) {
         (
-            tensor::mul(&l.clone(), &upstream.clone()).unwrap(),
-            tensor::mul(&r.clone(), &upstream.clone()).unwrap(),
+            Rc::new(Tensor::mul(&l.clone(), &upstream.clone()).unwrap()),
+            Rc::new(Tensor::mul(&r.clone(), &upstream.clone()).unwrap()),
         )
     }
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "Mul"
+    }
+    fn forward(&self, left: Rc<Tensor>, right: Rc<Tensor>) -> Tensor {
+        Tensor::mul(&left, &right).unwrap()
     }
 }
 
 #[derive(Debug)]
 pub struct SqrOp;
 impl UnaryOp for SqrOp {
-    fn get_grads(&self, upstream: &Tensor, _arg: &Tensor) -> Tensor {
-        tensor::mul(&Tensor::from(2.), upstream).unwrap()
+    fn get_grads(&self, upstream: Rc<Tensor>, _arg: Rc<Tensor>) -> Rc<Tensor> {
+        Rc::new(Tensor::mul(&Tensor::from(2.), &upstream).unwrap())
     }
 
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "Sqr"
     }
 }
@@ -76,13 +86,13 @@ pub struct MeanOp {
     input_n_elements: usize,
 }
 impl ReduceOp for MeanOp {
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "Mean"
     }
     /// gradient of mean is 1/n
     /// where n is the number of elements in the input tensor
-    fn get_grads(&self, upstream: &Tensor) -> Tensor {
-        return tensor::div(upstream, &Tensor::from(self.input_n_elements as f64)).unwrap();
+    fn get_grads(&self, upstream: Rc<Tensor>) -> Rc<Tensor> {
+        return Rc::new(Tensor::div(&upstream, &Tensor::from(self.input_n_elements as f64)).unwrap());
     }
 }
 
@@ -93,58 +103,58 @@ pub struct ReluOp {
     input_gt_zero_mask: Tensor,
 }
 impl UnaryOp for ReluOp {
-    fn get_grads(&self, upstream: &Tensor, arg: &Tensor) -> Tensor {
-        tensor::mul(&self.input_gt_zero_mask.clone(), &upstream.clone()).unwrap()
+    fn get_grads(&self, upstream: Rc<Tensor>, arg: Rc<Tensor>) -> Rc<Tensor> {
+        Rc::new(Tensor::mul(&self.input_gt_zero_mask.clone(), &upstream.clone()).unwrap())
     }
 
-    fn op_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "Relu"
     }
 }
 
 pub fn add(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(
-        AddOp,
-        (l.clone(), r.clone()),
-        tensor::add(&l.val(), &r.val()).unwrap(),
-    )
+    Node::new_bin_res(AddOp, l.clone(), r.clone())
 }
 
 pub fn mul(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(
-        MulOp,
-        (l.clone(), r.clone()),
-        tensor::mul(&l.val(), &r.val()).unwrap(),
-    )
-}
-
-pub fn sqr(x: Rc<Node>) -> Rc<Node> {
-    Node::new_unr_res(SqrOp, x.clone(), tensor::mul(&x.val(), &x.val()).unwrap())
+    Node::new_bin_res(MulOp, l.clone(), r.clone())
 }
 
 pub fn mmul(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(
-        MMulOp,
-        (l.clone(), r.clone()),
-        tensor::mmul(&l.val(), &r.val()),
-    )
+    Node::new_bin_res(MMulOp, l.clone(), r.clone())
 }
 
 pub fn sub(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(
-        SubOp,
-        (l.clone(), neg(r.clone())),
-        tensor::sub(&l.val(), &r.val()).unwrap(),
-    )
+    Node::new_bin_res(SubOp, l.clone(), r.clone())
+}
+
+// UNARY
+//
+
+pub fn sqr(x: Rc<Node>) -> Rc<Node> {
+    Node::new_unr_res(SqrOp, x.clone(), Tensor::mul(&x.val(), &x.val()).unwrap())
 }
 
 pub fn neg(x: Rc<Node>) -> Rc<Node> {
     Node::new_unr_res(
         SqrOp,
         x.clone(),
-        tensor::mul(&x.val(), &Tensor::from(-1.)).unwrap(),
+        Tensor::mul(&x.val(), &Tensor::from(-1.)).unwrap(),
     )
 }
+
+pub fn relu(x: Rc<Node>) -> Rc<Node> {
+    Node::new_unr_res(
+        ReluOp {
+            input_gt_zero_mask: Tensor::gt(&x.val(), 0.),
+        },
+        x.clone(),
+        Tensor::relu(&x.val()),
+    )
+}
+
+// REDUCE
+// 
 
 pub fn mean(x: Rc<Node>) -> Rc<Node> {
     Node::new_red_res(
@@ -152,16 +162,6 @@ pub fn mean(x: Rc<Node>) -> Rc<Node> {
             input_n_elements: x.val().n_elements(),
         },
         x.clone(),
-        tensor::mean(&x.val()),
-    )
-}
-
-pub fn relu(x: Rc<Node>) -> Rc<Node> {
-    Node::new_unr_res(
-        ReluOp {
-            input_gt_zero_mask: tensor::gt(&x.val(), 0.),
-        },
-        x.clone(),
-        tensor::relu(&x.val()),
+        Tensor::mean(&x.val()),
     )
 }

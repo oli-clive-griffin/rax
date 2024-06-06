@@ -1,13 +1,15 @@
 use rand::Rng;
 use std::{
-    fmt::{Debug, Write}, iter::zip, rc::Rc, vec
+    fmt::{Debug, Write},
+    iter::zip,
+    vec,
 };
 
 /// NOTE: this is a lightweight wrapper around a potentially huge Vec<f64>.
-/// cloning a `Tensor` is cheap.
+/// cloning a `Tensor` is NOT cheap.
 #[derive(Clone)]
 pub struct Tensor {
-    pub(crate) data: Rc<Vec<f64>>,
+    pub(crate) data: Vec<f64>,
     shape: Vec<usize>,
     stride: Vec<usize>,
 }
@@ -23,7 +25,7 @@ pub struct VecTensor {
 impl VecTensor {
     fn to_tensor(self) -> Tensor {
         Tensor {
-            data: Rc::new(self.data),
+            data: self.data,
             shape: self.shape,
             stride: self.stride,
         }
@@ -58,11 +60,11 @@ impl Debug for Tensor {
             let is_leaf = depth == full_depth;
 
             if is_leaf {
-                let digit = format!("{:.8}", &t.at(idx_stack).to_string());
+                let digit = format!("{:.8}", &t.at(idx_stack).unwrap().to_string());
                 f.write_str(&digit).unwrap();
 
                 let isnt_last_val =
-                    *idx_stack.last().unwrap_or(&0) != t.shape.last().unwrap_or(&0) - 1;
+                    *idx_stack.last().unwrap_or(&0) + 1 != *t.shape.last().unwrap_or(&0);
 
                 if isnt_last_val {
                     f.write_str(", ").unwrap();
@@ -131,7 +133,7 @@ impl Indexable for VecTensor {}
 impl From<&[f64]> for Tensor {
     fn from(data: &[f64]) -> Self {
         Tensor {
-            data: Rc::new(data.to_vec()),
+            data: data.to_vec(),
             shape: vec![data.len()],
             stride: vec![1],
         }
@@ -141,13 +143,12 @@ impl From<&[f64]> for Tensor {
 impl From<f64> for Tensor {
     fn from(data: f64) -> Self {
         Tensor {
-            data: Rc::new(vec![data]),
+            data: vec![data],
             shape: vec![],
             stride: vec![1],
         }
     }
 }
-
 
 impl Tensor {
     pub fn size(&self) -> &[usize] {
@@ -181,7 +182,10 @@ impl Tensor {
         if self.n_elements() == 1 {
             Ok(self.data[0])
         } else {
-            Err(format!("Can only call `item` on a singleton tensor, got {:?}", self.shape))
+            Err(format!(
+                "Can only call `item` on a singleton tensor, got {:?}",
+                self.shape
+            ))
         }
     }
 
@@ -205,10 +209,16 @@ impl Tensor {
         base.to_tensor()
     }
 
-    pub fn at(&self, indices: &Vec<usize>) -> f64 {
+    pub fn at(&self, indices: &Vec<usize>) -> Result<f64, String> {
         assert!(indices.len() == self.shape.len());
         let idx = self.flat_idx(indices);
-        self.data[idx]
+        if let Some(val) = self.data.get(idx) {
+            return Ok(*val);
+        }
+        Err(format!(
+            "Index out of bounds. indices: {:?}, shape: {:?}",
+            indices, self.shape
+        ))
     }
 
     // todo extend to arbitrary dimensions
@@ -226,9 +236,9 @@ impl Tensor {
             for j in 0..w {
                 let mut sum: f64 = 0.;
                 for k in 0..inner_dim {
-                    let l = self.at(&vec![i, k]);
-                    let r = rhs.at(&vec![k, j]);
-                    sum += l + r;
+                    let l = self.at(&vec![i, k]).unwrap();
+                    let r = rhs.at(&vec![k, j]).unwrap();
+                    sum += l * r;
                 }
                 *out.at_mut(&vec![i, j]) = sum;
             }
@@ -258,10 +268,50 @@ impl Tensor {
     pub fn zeros(shape: &Vec<usize>) -> Tensor {
         let capacity = shape.iter().product();
         Tensor {
-            data: Rc::new(vec![0.; capacity]),
+            data: vec![0.; capacity],
             shape: shape.clone(),
             stride: Tensor::get_postfix_prod(shape),
         }
+    }
+
+    pub fn add(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
+        elementwise_broadcasted_map(&l, &r, &|l, r| l + r)
+    }
+
+    pub fn mul(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
+        elementwise_broadcasted_map(&l, &r, &|l, r| l * r)
+    }
+
+    pub fn sub(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
+        elementwise_broadcasted_map(&l, &r, &|l, r| l - r)
+    }
+
+    pub fn div(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
+        elementwise_broadcasted_map(&l, &r, &|l, r| l / r)
+    }
+
+    pub fn sqr(t: &Tensor) -> Result<Tensor, ShapeError> {
+        elementwise_map(&t, &|a| a * a)
+    }
+
+    /// extremely naive implementation of mean
+    pub fn mean(val: &Tensor) -> Tensor {
+        let n: usize = val.shape.iter().product();
+        let sum = val.data.iter().sum::<f64>();
+        Tensor::from(sum / n as f64)
+    }
+
+    pub fn relu(t: &Tensor) -> Tensor {
+        return Self::mul(&Self::gt(t, 0.), t).unwrap();
+    }
+
+    /// creates a mask of 1s and 0s where the input tensor is greater than the threshold
+    pub fn gt(val: &Tensor, threshold: f64) -> Tensor {
+        elementwise_map(val, &|v| if v > threshold { 1. } else { 0. }).unwrap()
+    }
+
+    pub fn mmul(l: &Tensor, r: &Tensor) -> Tensor {
+        l.matmul(r)
     }
 }
 
@@ -313,36 +363,35 @@ fn get_broadcast_directions(shape_l: Vec<usize>, shape_r: Vec<usize>) -> Option<
     Some(out)
 }
 
-pub fn mmul(l: &Tensor, r: &Tensor) -> Tensor {
-    l.matmul(r)
-}
-
 #[derive(Debug)]
 pub struct ShapeError;
 
 fn elementwise_broadcasted_map(
-    r: &Tensor,
     l: &Tensor,
+    r: &Tensor,
     func: &impl Fn(f64, f64) -> f64,
 ) -> Result<Tensor, ShapeError> {
-    let broadcast_dirs = get_broadcast_directions(l.shape.clone(), r.shape.clone()).ok_or(ShapeError)?;
+    let broadcast_dirs =
+        get_broadcast_directions(l.shape.clone(), r.shape.clone()).ok_or(ShapeError)?;
 
-    let mut r = r.clone();
-    let mut l = l.clone();
+    let mut inner_r = r.clone();
+    let mut inner_l = l.clone();
 
-    while r.shape.len() < broadcast_dirs.len() {
-        r.unsqueeze_(0);
+    while inner_r.shape.len() < broadcast_dirs.len() {
+        inner_r.unsqueeze_(0);
     }
-    while l.shape.len() < broadcast_dirs.len() {
-        l.unsqueeze_(0);
+    while inner_l.shape.len() < broadcast_dirs.len() {
+        inner_l.unsqueeze_(0);
     }
 
     let mut idx_stack: Vec<usize> = vec![];
     let mut r_stack: Vec<usize> = vec![];
     let mut l_stack: Vec<usize> = vec![];
 
-    let elemwise_max = zip(&l.shape, &r.shape).map(|(a, b)| max(*a, *b)).collect();
-    let mut out = VecTensor::zeroes(&elemwise_max);
+    let elemwise_max_shape = zip(inner_l.shape.clone(), inner_r.shape.clone())
+        .map(max)
+        .collect();
+    let mut out = VecTensor::zeroes(&elemwise_max_shape);
 
     fn inner(
         r: &Tensor,
@@ -358,7 +407,7 @@ fn elementwise_broadcasted_map(
         let depth = out_stack.len();
 
         if depth == full_depth {
-            *out.at_mut(out_stack) = func(r.at(r_stack), l.at(l_stack));
+            *out.at_mut(out_stack) = func(l.at(r_stack).unwrap(), r.at(l_stack).unwrap());
             return;
         }
 
@@ -392,9 +441,9 @@ fn elementwise_broadcasted_map(
     }
 
     inner(
-        &r,
+        &inner_r,
         &mut r_stack,
-        &l,
+        &inner_l,
         &mut l_stack,
         &mut out,
         &mut idx_stack,
@@ -405,10 +454,7 @@ fn elementwise_broadcasted_map(
     Ok(out.to_tensor())
 }
 
-fn elementwise_map(
-    t: &Tensor,
-    func: &impl Fn(f64) -> f64,
-) -> Result<Tensor, ShapeError> {
+fn elementwise_map(t: &Tensor, func: &impl Fn(f64) -> f64) -> Result<Tensor, ShapeError> {
     let mut idx_stack: Vec<usize> = vec![];
 
     let mut out = VecTensor::zeroes(&t.shape);
@@ -423,7 +469,7 @@ fn elementwise_map(
         let depth = idx_stack.len();
 
         if depth == full_depth {
-            *out.at_mut(idx_stack) = func(t.at(idx_stack));
+            *out.at_mut(idx_stack) = func(t.at(idx_stack).unwrap());
             return;
         }
 
@@ -434,38 +480,12 @@ fn elementwise_map(
         }
     }
 
-    inner(
-        &t,
-        &mut out,
-        &mut idx_stack,
-        func,
-        t.size().len(),
-    );
+    inner(&t, &mut out, &mut idx_stack, func, t.size().len());
 
     Ok(out.to_tensor())
 }
 
-pub fn add(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a + b)
-}
-
-pub fn mul(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a * b)
-}
-
-pub fn sub(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a - b)
-}
-
-pub fn div(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&r, &l, &|a, b| a / b)
-}
-
-pub fn sqr(t: &Tensor) -> Result<Tensor, ShapeError> {
-    elementwise_broadcasted_map(&t, &t, &|a, _| a * a)
-}
-
-fn max(a: usize, b: usize) -> usize {
+fn max((a, b): (usize, usize)) -> usize {
     if a > b {
         a
     } else {
@@ -481,7 +501,7 @@ mod tests {
     fn test_transpose() {
         let a = Tensor::rand(&vec![4, 4]);
         let a_t = a.transpose(0, 1);
-        assert!(a.at(&vec![2, 3]) == a_t.at(&vec![3, 2]));
+        assert!(a.at(&vec![2, 3]).unwrap() == a_t.at(&vec![3, 2]).unwrap());
     }
 
     #[test]
@@ -552,24 +572,24 @@ mod tests {
         let t = Tensor::rand(&vec![1, 2, 3]);
         let scalar: &[f64] = &[1.];
         let scalar = Tensor::from(scalar);
-        add(&t, &scalar).unwrap();
+        Tensor::add(&t, &scalar).unwrap();
     }
 
     #[test]
     fn test_add() {
         let l = Tensor {
-            data: Rc::new(vec![1., 2., 3.]),
+            data: vec![1., 2., 3.],
             shape: vec![1, 3],
             stride: vec![3, 1],
         };
 
         let r = Tensor {
-            data: Rc::new(vec![7., 2.]),
+            data: vec![7., 2.],
             shape: vec![1, 2, 1],
             stride: Tensor::get_postfix_prod(&vec![1, 2, 1]),
         };
 
-        let res = add(&l, &r).unwrap();
+        let res = Tensor::add(&l, &r).unwrap();
         println!("{:?}", res);
         // todo implement actual test
     }
@@ -577,26 +597,29 @@ mod tests {
     #[test]
     fn test_display() {
         let md = Tensor {
-            data: Rc::new((0..24).map(|i| i as f64).collect::<Vec<f64>>()),
+            data: (0..24).map(|i| i as f64).collect::<Vec<f64>>(),
             shape: vec![4, 2, 3],
             stride: Tensor::get_postfix_prod(&vec![4, 2, 3]),
         };
         println!("{:?}", md);
     }
-}
 
-/// extremely naive implementation of mean
-pub(crate) fn mean(val: &Tensor) -> Tensor {
-    let n: usize = val.shape.iter().product();
-    let sum = val.data.iter().sum::<f64>();
-    Tensor::from(sum / n as f64)
-}
+    #[test]
+    fn test_sub() {
+        let l = Tensor {
+            data: vec![3.],
+            shape: vec![],
+            stride: vec![1],
+        };
 
-pub(crate) fn relu(t: &Tensor) -> Tensor {
-    return mul(&gt(t, 0.), t).unwrap();
-}
+        let r = Tensor {
+            data: vec![2.],
+            shape: vec![],
+            stride: vec![1],
+        };
 
-/// creates a mask of 1s and 0s where the input tensor is greater than the threshold
-pub(crate) fn gt(val: &Tensor, threshold: f64) -> Tensor {
-    elementwise_map(val, &|v| if v > threshold { 1. } else { 0. }).unwrap()
+        let res = Tensor::sub(&l, &r).unwrap();
+
+        assert!(res.item().unwrap() == 1.);
+    }
 }
