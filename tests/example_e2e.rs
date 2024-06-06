@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[test]
-fn test_train() {
+fn test_train_mlp() {
     // a dead simple MLP. the model is a pure forward pass function,
     // without having to worry about stateful parameter handling.
     fn model(params: &ParamsMap, x: Tensor) -> Rc<Node> {
@@ -21,15 +21,10 @@ fn test_train() {
         let input = Rc::new(Node::TensorParam(x, "input"));
 
         let x1 = relu(add(mmul(input, w1), b1));
-        // println!("x1: {:?}", x1.val()); // print the tensor, not the node + subtree
-
         let x2 = relu(add(mmul(x1, w2), b2));
-        // println!("x2: {:?}", x2.val()); // print the tensor, not the node + subtree
+        let x3 = relu(add(mmul(x2, w3), b3));
 
-        
-        // println!("x3: {:?}", x3.val()); // print the tensor, not the node + subtree
-
-        relu(add(mmul(x2, w3), b3))
+        x3
     }
 
     fn forward(params: &ParamsMap, input: Tensor, label: Tensor) -> (Tensor, GradMap) {
@@ -66,7 +61,7 @@ fn test_train() {
             let (loss, grads_map) = forward(&params, x.clone(), y.clone());
             params = optim.update(params, grads_map);
 
-            if i % 10 == 0 {
+            if i % 1000 == 0 {
                 println!("loss: {:.4}", loss.item().unwrap());
             }
 

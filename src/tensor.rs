@@ -374,9 +374,10 @@ fn elementwise_broadcasted_map(
     let broadcast_dirs =
         get_broadcast_directions(l.shape.clone(), r.shape.clone()).ok_or(ShapeError)?;
 
+    // give empty leading dimensions to the smaller tensor if needed
+    // as it dramatically simplifies syncing the pointers
     let mut inner_r = r.clone();
     let mut inner_l = l.clone();
-
     while inner_r.shape.len() < broadcast_dirs.len() {
         inner_r.unsqueeze_(0);
     }
