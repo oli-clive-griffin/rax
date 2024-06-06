@@ -37,7 +37,7 @@ impl Optimizer for SGD {
     }
 }
 
-const DEFAULT_LR: f64 = 1e-3;
+const DEFAULT_LR: f64 = 1e-4;
 impl Default for SGD {
     fn default() -> Self {
         SGD { lr: DEFAULT_LR }

@@ -407,7 +407,7 @@ fn elementwise_broadcasted_map(
         let depth = out_stack.len();
 
         if depth == full_depth {
-            *out.at_mut(out_stack) = func(l.at(r_stack).unwrap(), r.at(l_stack).unwrap());
+            *out.at_mut(out_stack) = func(l.at(l_stack).unwrap(), r.at(r_stack).unwrap());
             return;
         }
 

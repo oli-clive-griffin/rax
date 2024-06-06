@@ -31,10 +31,6 @@ fn test_train() {
         let x3 = relu(add(mmul(x2, w3), b3));
         // println!("x3: {:?}", x3.val()); // print the tensor, not the node + subtree
 
-        if x3.val().item().unwrap() - 0.01 < 1e-3 {
-            println!("x3: {:.4}", x3.val().item().unwrap());
-        }
-
         x3
     }
 
@@ -68,10 +64,14 @@ fn test_train() {
         let x = Tensor::rand(&vec![1, 3]);
         let y = Tensor::rand(&vec![1, 1]);
 
-        loop {
+        for i in 0.. {
             let (loss, grads_map) = forward(&params, x.clone(), y.clone());
             params = optim.update(params, grads_map);
-            sleep(Duration::from_millis(50));
+
+            if i % 10 == 0 {
+                println!("loss: {:.4}", loss.item().unwrap());
+            }
+
             if loss.item().unwrap() < 1e-6 {
                 break;
             }
@@ -85,17 +85,13 @@ fn test_train() {
     println!("{:?}", params);
 }
 
-
-
 #[test]
-fn test__train_simple() {
-    // a dead simple MLP. the model is a pure forward pass function,
-    // without having to worry about stateful parameter handling.
+fn test_train_simple() {
     fn model(params: &ParamsMap) -> Rc<Node> {
-        let w1 = Rc::new(Node::TensorParam(params.0.get("w1").unwrap().clone(), "w1"));
-        let w2 = Rc::new(Node::TensorParam(params.0.get("w2").unwrap().clone(), "w2"));
+        let a = Rc::new(Node::TensorParam(params.0.get("a").unwrap().clone(), "a"));
+        let b = Rc::new(Node::TensorParam(params.0.get("b").unwrap().clone(), "b"));
 
-        add(w1, w2)
+        add(a, b)
     }
 
     fn forward(params: &ParamsMap) -> (Tensor, GradMap) {
@@ -107,24 +103,20 @@ fn test__train_simple() {
 
     fn train_model() -> ParamsMap {
         let mut params = ParamsMap(HashMap::from([
-            ("w1".to_string(), Tensor::rand(&vec![1])),
-            ("w2".to_string(), Tensor::rand(&vec![1])),
+            ("a".to_string(), Tensor::rand(&vec![1])),
+            ("b".to_string(), Tensor::rand(&vec![1])),
         ]));
 
         let optim = SGD::default();
 
-        loop {
+        for i in 0.. {
             let (loss, grads_map) = forward(&params);
-            println!(
-                "params: {:#?}, grads: {:#?}",
-                params, grads_map, 
-            );
-            let new_params = optim.update(params, grads_map);
-            println!("new_params: {:?}", new_params);
-            params = new_params;
-            println!("loss: {}", loss.item().unwrap());
-            println!("\n-------------------\n");
-            sleep(Duration::from_millis(50));
+            params = optim.update(params, grads_map);
+
+            if i % 10 == 0 {
+                println!("loss: {:.4}", loss.item().unwrap());
+            }
+
             if loss.item().unwrap() < 1e-6 {
                 break;
             }
