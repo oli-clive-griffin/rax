@@ -7,13 +7,13 @@ use crate::tensor::Tensor;
 pub struct BinOpTrace {
     arg1: Box<DTrace>,
     arg2: Box<DTrace>,
-    name: &'static str,
+    // name: &'static str,
 }
 
 #[derive(Debug)]
 pub struct UnaryOpTrace {
     arg: Box<DTrace>,
-    name: &'static str,
+    // name: &'static str,
 }
 
 #[derive(Debug)]
@@ -56,7 +56,7 @@ impl BinaryOpResult {
         DTrace::BinOp(BinOpTrace {
             arg1: Box::new(self.args.0.back_impl(g1)),
             arg2: Box::new(self.args.1.back_impl(g2)),
-            name: self.op.name(),
+            // name: self.op.name(),
         })
     }
 }
@@ -69,7 +69,7 @@ impl UnaryOpResult {
                 self.arg
                     .back_impl(Rc::new(Tensor::mul(&g, &upstream).unwrap())),
             ),
-            name: self.op.name(),
+            // name: self.op.name(),
         })
     }
 }

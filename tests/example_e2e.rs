@@ -26,10 +26,10 @@ fn test_train() {
         let x2 = relu(add(mmul(x1, w2), b2));
         // println!("x2: {:?}", x2.val()); // print the tensor, not the node + subtree
 
-        let x3 = relu(add(mmul(x2, w3), b3));
+        
         // println!("x3: {:?}", x3.val()); // print the tensor, not the node + subtree
 
-        x3
+        relu(add(mmul(x2, w3), b3))
     }
 
     fn forward(params: &ParamsMap, input: Tensor, label: Tensor) -> (Tensor, GradMap) {
