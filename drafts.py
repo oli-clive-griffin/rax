@@ -63,7 +63,7 @@ def add2(l, r, out, dirs):
                     l.append(idx)
                     r.append(idx)
                 case _:
-                    raise ValueError(f'huh?, got {broadcastdir=}')
+                    raise Rc<Tensor>ueError(f'huh?, got {broadcastdir=}')
         return l, r
 
     def nested_loop(depth: int):
