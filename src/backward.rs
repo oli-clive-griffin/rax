@@ -88,6 +88,8 @@ pub fn accum_grads(node: DTrace) -> GradMap {
     map
 }
 
+/// Traverse the trace tree, accumulating gradients and summing gradients
+/// for the same parameter (deduping by name)
 fn _accum_grads(node: &DTrace, map: &mut GradMap) {
     match node {
         DTrace::BinOp(op) => {
@@ -96,17 +98,20 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
         }
         DTrace::UnaryOp(op) => _accum_grads(&op.arg, map),
         DTrace::DParamDX(param) => {
-            let current_value = map
-                .entry(param.param_name.to_string())
-                .or_insert(Tensor::from(0.));
-            let res = Tensor::add(current_value, &param.d_val).unwrap_or_else(|_| {
-                panic!(
-                    "could not add tensors with shapes {:?} and {:?}",
-                    current_value.size(),
-                    param.d_val.size()
-                )
-            });
-            *current_value = res
+            let name = param.param_name.to_string();
+
+            if let Some(current_value) = map.get_mut(&name) {
+                *current_value = Tensor::add(current_value, &param.d_val).unwrap_or_else(|_| {
+                    panic!(
+                        "could not add tensors with shapes {:?} and {:?}",
+                        current_value.size(),
+                        param.d_val.size()
+                    )
+                });
+                return;
+            };
+
+            map.insert(name, Tensor::from(0.));
         }
     }
 }

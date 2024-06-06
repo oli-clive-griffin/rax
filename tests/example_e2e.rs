@@ -5,8 +5,6 @@ use rusty_grad::optimizer::{Optimizer, ParamsMap, SGD};
 use rusty_grad::tensor::Tensor;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::thread::sleep;
-use std::time::Duration;
 
 #[test]
 fn test_train() {
