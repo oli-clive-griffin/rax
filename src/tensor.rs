@@ -23,19 +23,19 @@ pub struct VecTensor {
 
 /// A tensor managed as a vec. As opposed to `Tensor`, which is managed as an Rc<Vec<f64>>.
 impl VecTensor {
-    fn to_tensor(self) -> Tensor {
+    fn as_tensor(&self) -> Tensor {
         Tensor {
-            data: self.data,
-            shape: self.shape,
-            stride: self.stride,
+            data: self.data.clone(),
+            shape: self.shape.clone(),
+            stride: self.stride.clone(),
         }
     }
 
-    pub fn zeroes(shape: &Vec<usize>) -> VecTensor {
+    pub fn zeroes(shape: &[usize]) -> VecTensor {
         let capacity = shape.iter().product();
         VecTensor {
             data: vec![0.; capacity],
-            shape: shape.clone(),
+            shape: shape.to_vec(),
             stride: Tensor::get_postfix_prod(shape),
         }
     }
@@ -189,7 +189,7 @@ impl Tensor {
         }
     }
 
-    fn get_postfix_prod(shape: &Vec<usize>) -> Vec<usize> {
+    fn get_postfix_prod(shape: &[usize]) -> Vec<usize> {
         let l = shape.len();
         let mut out: Vec<usize> = vec![0; l];
         let mut n = 1;
@@ -200,13 +200,13 @@ impl Tensor {
         out
     }
 
-    pub fn rand(shape: &Vec<usize>) -> Tensor {
+    pub fn rand(shape: &[usize]) -> Tensor {
         let mut rng = rand::thread_rng();
         let mut base = VecTensor::zeroes(shape);
         for n in base.data.iter_mut() {
             *n = rng.gen();
         }
-        base.to_tensor()
+        base.as_tensor()
     }
 
     pub fn at(&self, indices: &Vec<usize>) -> Result<f64, String> {
@@ -231,7 +231,7 @@ impl Tensor {
         let h = self.shape[0];
         let w = rhs.shape[1];
         let inner_dim = self.shape[1];
-        let mut out = VecTensor::zeroes(&vec![h, w]);
+        let mut out = VecTensor::zeroes(&[h, w]);
         for i in 0..h {
             for j in 0..w {
                 let mut sum: f64 = 0.;
@@ -243,7 +243,7 @@ impl Tensor {
                 *out.at_mut(&vec![i, j]) = sum;
             }
         }
-        out.to_tensor()
+        out.as_tensor()
     }
 
     pub fn transpose(&self, dim_idx_1: isize, dim_idx_2: isize) -> Tensor {
@@ -265,11 +265,11 @@ impl Tensor {
         }
     }
 
-    pub fn zeros(shape: &Vec<usize>) -> Tensor {
+    pub fn zeros(shape: &[usize]) -> Tensor {
         let capacity = shape.iter().product();
         Tensor {
             data: vec![0.; capacity],
-            shape: shape.clone(),
+            shape: shape.to_vec(),
             stride: Tensor::get_postfix_prod(shape),
         }
     }
@@ -318,8 +318,8 @@ impl Tensor {
 #[derive(PartialEq, Eq, Debug)]
 enum BroadcastDir {
     UnNeeded,
-    LTR, // left broadcasts to right,
-    RTL, // right broadcasts to left,
+    LtR, // left broadcasts to right,
+    RtL, // right broadcasts to left,
 }
 fn get_broadcast_directions(shape_l: Vec<usize>, shape_r: Vec<usize>) -> Option<Vec<BroadcastDir>> {
     let l = if shape_l.len() > shape_r.len() {
@@ -346,8 +346,8 @@ fn get_broadcast_directions(shape_l: Vec<usize>, shape_r: Vec<usize>) -> Option<
 
         let broadcast_dir = match (dim_l, dim_r) {
             (1, 1) => BroadcastDir::UnNeeded,
-            (1, _) => BroadcastDir::LTR,
-            (_, 1) => BroadcastDir::RTL,
+            (1, _) => BroadcastDir::LtR,
+            (_, 1) => BroadcastDir::RtL,
             (_, _) => {
                 if dim_l == dim_r {
                     BroadcastDir::UnNeeded
@@ -369,7 +369,7 @@ pub struct ShapeError;
 fn elementwise_broadcasted_map(
     l: &Tensor,
     r: &Tensor,
-    func: &impl Fn(f64, f64) -> f64,
+    elementwise_func: &impl Fn(f64, f64) -> f64,
 ) -> Result<Tensor, ShapeError> {
     let broadcast_dirs =
         get_broadcast_directions(l.shape.clone(), r.shape.clone()).ok_or(ShapeError)?;
@@ -388,11 +388,13 @@ fn elementwise_broadcasted_map(
     let mut r_stack: Vec<usize> = vec![];
     let mut l_stack: Vec<usize> = vec![];
 
-    let elemwise_max_shape = zip(inner_l.shape.clone(), inner_r.shape.clone())
+    let elemwise_max_shape: Vec<usize> = zip(inner_l.shape.clone(), inner_r.shape.clone())
         .map(max)
         .collect();
+
     let mut out = VecTensor::zeroes(&elemwise_max_shape);
 
+    #[allow(clippy::too_many_arguments)]
     fn inner(
         r: &Tensor,
         r_stack: &mut Vec<usize>,
@@ -401,13 +403,13 @@ fn elementwise_broadcasted_map(
         out: &mut VecTensor,
         out_stack: &mut Vec<usize>,
         broadcast_dirs: &Vec<BroadcastDir>,
-        func: &impl Fn(f64, f64) -> f64,
+        elementwise_func: &impl Fn(f64, f64) -> f64,
     ) {
         let full_depth = broadcast_dirs.len();
         let depth = out_stack.len();
 
         if depth == full_depth {
-            *out.at_mut(out_stack) = func(l.at(l_stack).unwrap(), r.at(r_stack).unwrap());
+            *out.at_mut(out_stack) = elementwise_func(l.at(l_stack).unwrap(), r.at(r_stack).unwrap());
             return;
         }
 
@@ -421,18 +423,18 @@ fn elementwise_broadcasted_map(
             // dimension, push `0` onto the appropriate
             // stack so that the pointer stays pointing
             // at index 0 for that dimension
-            r_stack.push(if broadcast_direction_for_depth == &BroadcastDir::RTL {
+            r_stack.push(if broadcast_direction_for_depth == &BroadcastDir::RtL {
                 0
             } else {
                 dim_idx
             });
-            l_stack.push(if broadcast_direction_for_depth == &BroadcastDir::LTR {
+            l_stack.push(if broadcast_direction_for_depth == &BroadcastDir::LtR {
                 0
             } else {
                 dim_idx
             });
 
-            inner(r, r_stack, l, l_stack, out, out_stack, broadcast_dirs, func);
+            inner(r, r_stack, l, l_stack, out, out_stack, broadcast_dirs, elementwise_func);
 
             out_stack.pop();
             r_stack.pop();
@@ -448,10 +450,10 @@ fn elementwise_broadcasted_map(
         &mut out,
         &mut idx_stack,
         &broadcast_dirs,
-        func,
+        elementwise_func,
     );
 
-    Ok(out.to_tensor())
+    Ok(out.as_tensor())
 }
 
 fn elementwise_map(t: &Tensor, func: &impl Fn(f64) -> f64) -> Result<Tensor, ShapeError> {
@@ -482,7 +484,7 @@ fn elementwise_map(t: &Tensor, func: &impl Fn(f64) -> f64) -> Result<Tensor, Sha
 
     inner(t, &mut out, &mut idx_stack, func, t.size().len());
 
-    Ok(out.to_tensor())
+    Ok(out.as_tensor())
 }
 
 fn max((a, b): (usize, usize)) -> usize {
@@ -544,8 +546,8 @@ mod tests {
         let shape_r: Vec<usize> = vec![1, 1, 3];
         let expected = vec![
             BroadcastDir::UnNeeded,
-            BroadcastDir::RTL, // right broadcasts to left
-            BroadcastDir::LTR, // left broadcasts to right
+            BroadcastDir::RtL, // right broadcasts to left
+            BroadcastDir::LtR, // left broadcasts to right
         ];
 
         let result = get_broadcast_directions(shape_l, shape_r);
@@ -557,10 +559,10 @@ mod tests {
         let shape_l: Vec<usize> = vec![2, 1, 2, 1];
         let shape_r: Vec<usize> = vec![1, 1, 3];
         let expected = vec![
-            BroadcastDir::RTL,
+            BroadcastDir::RtL,
             BroadcastDir::UnNeeded,
-            BroadcastDir::RTL,
-            BroadcastDir::LTR,
+            BroadcastDir::RtL,
+            BroadcastDir::LtR,
         ];
 
         let result = get_broadcast_directions(shape_l, shape_r);
