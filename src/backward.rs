@@ -7,13 +7,11 @@ use crate::tensor::Tensor;
 pub struct BinOpTrace {
     arg1: Box<DTrace>,
     arg2: Box<DTrace>,
-    // name: &'static str,
 }
 
 #[derive(Debug)]
 pub struct UnaryOpTrace {
     arg: Box<DTrace>,
-    // name: &'static str,
 }
 
 #[derive(Debug)]
@@ -100,18 +98,16 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
         DTrace::DParamDX(param) => {
             let name = param.param_name.to_string();
 
-            if let Some(current_value) = map.get_mut(&name) {
-                *current_value = Tensor::add(current_value, &param.d_val).unwrap_or_else(|_| {
-                    panic!(
-                        "could not add tensors with shapes {:?} and {:?}",
-                        current_value.size(),
-                        param.d_val.size()
-                    )
-                });
-                return;
-            };
+            let current_value = map.entry(name).or_insert(Tensor::from(0.));
 
-            map.insert(name, Tensor::from(0.));
+            *current_value = Tensor::add(current_value, &param.d_val).unwrap_or_else(|_| {
+                panic!(
+                    "could not add tensors with shapes {:?} and {:?}",
+                    current_value.size(),
+                    param.d_val.size()
+                )
+            });
+
         }
     }
 }

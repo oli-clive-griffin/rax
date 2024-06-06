@@ -61,13 +61,14 @@ fn test_train_mlp() {
             let (loss, grads_map) = forward(&params, x.clone(), y.clone());
             params = optim.update(params, grads_map);
 
-            if i % 1000 == 0 {
+            if i % 100 == 0 {
                 println!("loss: {:.4}", loss.item().unwrap());
             }
 
             if loss.item().unwrap() < 1e-6 {
                 break;
             }
+
         }
 
         params
