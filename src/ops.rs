@@ -92,7 +92,7 @@ impl ReduceOp for MeanOp {
     /// gradient of mean is 1/n
     /// where n is the number of elements in the input tensor
     fn get_grads(&self, upstream: Rc<Tensor>) -> Rc<Tensor> {
-        return Rc::new(Tensor::div(&upstream, &Tensor::from(self.input_n_elements as f64)).unwrap());
+        Rc::new(Tensor::div(&upstream, &Tensor::from(self.input_n_elements as f64)).unwrap())
     }
 }
 
@@ -103,7 +103,7 @@ pub struct ReluOp {
     input_gt_zero_mask: Tensor,
 }
 impl UnaryOp for ReluOp {
-    fn get_grads(&self, upstream: Rc<Tensor>, arg: Rc<Tensor>) -> Rc<Tensor> {
+    fn get_grads(&self, upstream: Rc<Tensor>, _arg: Rc<Tensor>) -> Rc<Tensor> {
         Rc::new(Tensor::mul(&self.input_gt_zero_mask.clone(), &upstream.clone()).unwrap())
     }
 

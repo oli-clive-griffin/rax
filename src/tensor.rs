@@ -259,7 +259,7 @@ impl Tensor {
 
     fn idx(&self, idx: isize) -> usize {
         if idx < 0 {
-            self.shape.len() - 1 + idx.abs() as usize
+            self.shape.len() - 1 + idx.unsigned_abs()
         } else {
             idx as usize
         }
@@ -275,23 +275,23 @@ impl Tensor {
     }
 
     pub fn add(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-        elementwise_broadcasted_map(&l, &r, &|l, r| l + r)
+        elementwise_broadcasted_map(l, r, &|l, r| l + r)
     }
 
     pub fn mul(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-        elementwise_broadcasted_map(&l, &r, &|l, r| l * r)
+        elementwise_broadcasted_map(l, r, &|l, r| l * r)
     }
 
     pub fn sub(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-        elementwise_broadcasted_map(&l, &r, &|l, r| l - r)
+        elementwise_broadcasted_map(l, r, &|l, r| l - r)
     }
 
     pub fn div(l: &Tensor, r: &Tensor) -> Result<Tensor, ShapeError> {
-        elementwise_broadcasted_map(&l, &r, &|l, r| l / r)
+        elementwise_broadcasted_map(l, r, &|l, r| l / r)
     }
 
     pub fn sqr(t: &Tensor) -> Result<Tensor, ShapeError> {
-        elementwise_map(&t, &|a| a * a)
+        elementwise_map(t, &|a| a * a)
     }
 
     /// extremely naive implementation of mean
@@ -302,7 +302,7 @@ impl Tensor {
     }
 
     pub fn relu(t: &Tensor) -> Tensor {
-        return Self::mul(&Self::gt(t, 0.), t).unwrap();
+        Self::mul(&Self::gt(t, 0.), t).unwrap()
     }
 
     /// creates a mask of 1s and 0s where the input tensor is greater than the threshold
@@ -480,7 +480,7 @@ fn elementwise_map(t: &Tensor, func: &impl Fn(f64) -> f64) -> Result<Tensor, Sha
         }
     }
 
-    inner(&t, &mut out, &mut idx_stack, func, t.size().len());
+    inner(t, &mut out, &mut idx_stack, func, t.size().len());
 
     Ok(out.to_tensor())
 }

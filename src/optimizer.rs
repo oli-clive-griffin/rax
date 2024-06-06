@@ -9,6 +9,12 @@ pub trait Optimizer {
 
 #[derive(Debug)]
 pub struct ParamsMap(pub HashMap<String, Tensor>);
+impl Default for ParamsMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ParamsMap {
     pub fn new() -> Self {
         ParamsMap(HashMap::new())
@@ -24,7 +30,7 @@ impl Optimizer for SGD {
         for (name, param) in params.0.iter_mut() {
             let grad = grads.get(name).unwrap();
             let update = Tensor::mul(grad, &Tensor::from(self.lr)).unwrap();
-            let new = Tensor::sub(&param, &update).unwrap();
+            let new = Tensor::sub(param, &update).unwrap();
             *param = new;
         }
         params

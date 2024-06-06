@@ -1,6 +1,6 @@
 use rusty_grad::backward::{accum_grads, GradMap};
 use rusty_grad::node::Node;
-use rusty_grad::ops::{add, mul, mmul, relu, sqr, sub};
+use rusty_grad::ops::{add, mmul, relu, sqr, sub};
 use rusty_grad::optimizer::{Optimizer, ParamsMap, SGD};
 use rusty_grad::tensor::Tensor;
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ fn test_train() {
             println!("x3: {:.4}", x3.val().item().unwrap());
         }
 
-        return x3;
+        x3
     }
 
     fn forward(params: &ParamsMap, input: Tensor, label: Tensor) -> (Tensor, GradMap) {
@@ -77,7 +77,7 @@ fn test_train() {
             }
         }
 
-        return params;
+        params
     }
 
     println!("Training model...");
@@ -130,7 +130,7 @@ fn test__train_simple() {
             }
         }
 
-        return params;
+        params
     }
 
     println!("Training model...");
