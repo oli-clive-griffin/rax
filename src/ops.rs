@@ -112,21 +112,18 @@ impl UnaryOp for ReluOp {
     }
 }
 
-pub fn add(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(AddOp, l.clone(), r.clone())
+macro_rules! create_binary_op {
+    ($name:ident, $op:ident) => {
+        pub fn $name(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
+            Node::new_bin_res($op, l, r)
+        }
+    };
 }
 
-pub fn mul(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(MulOp, l.clone(), r.clone())
-}
-
-pub fn mmul(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(MMulOp, l.clone(), r.clone())
-}
-
-pub fn sub(l: Rc<Node>, r: Rc<Node>) -> Rc<Node> {
-    Node::new_bin_res(SubOp, l.clone(), r.clone())
-}
+create_binary_op!(add, AddOp);
+create_binary_op!(mul, MulOp);
+create_binary_op!(mmul, MMulOp);
+create_binary_op!(sub, SubOp);
 
 // UNARY
 //
