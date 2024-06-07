@@ -23,13 +23,11 @@ new_param = update(params, gradients_graph)
     - Reduce Ops: mean, etc.
 - Gradient computation.
     - `Node::backward` takes a computational graph and returns a trace of that graph with the parameters swapped for their gradients with respect to the head of the graph
-- Etc.
-    - A SGD optimizer
-    - 
+- An SGD optimizer
 
 ## What I'm probably not going to do:
 - Make it fast
-    - It's ridiculously slow. for example broadcasting is implemented as a (in my opinion very elegant, but extremely slow) recursive tree traversal.
+    - It's ridiculously slow. for example broadcasting is implemented as a (in my opinion pretty elegant, but extremely slow) recursive tree traversal.
     - I'm fine with this, for now I'm interested in different challenges.
 - Add helpful training constructs
     - Maybe I'll add a few more optimizers, but I'm not trying to actually train models with this.
