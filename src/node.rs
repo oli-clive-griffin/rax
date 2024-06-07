@@ -44,7 +44,7 @@ pub trait UnaryOp: Debug {
 }
 
 pub trait ReduceOp: Debug {
-    fn get_grads(&self, arg: Rc<Tensor>) -> Rc<Tensor>;
+    fn get_grads(&self, upstream: Rc<Tensor>, arg: Rc<Tensor>) -> Rc<Tensor>;
     fn name(&self) -> &'static str;
 }
 

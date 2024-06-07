@@ -15,6 +15,12 @@ pub struct UnaryOpTrace {
 }
 
 #[derive(Debug)]
+pub struct ReduceOpTrace {
+    arg: Box<DTrace>,
+}
+
+
+#[derive(Debug)]
 pub struct DParamDX {
     d_val: Rc<Tensor>,
     param_name: &'static str,
@@ -24,6 +30,7 @@ pub struct DParamDX {
 pub enum DTrace {
     BinOp(BinOpTrace),
     UnaryOp(UnaryOpTrace),
+    ReduceOp(ReduceOpTrace),
     DParamDX(DParamDX),
 }
 
@@ -63,18 +70,17 @@ impl UnaryOpResult {
     fn back(&self, upstream: Rc<Tensor>) -> DTrace {
         let g = self.op.get_grads(upstream.clone(), Rc::new(self.arg.val()));
         DTrace::UnaryOp(UnaryOpTrace {
-            arg: Box::new(
-                self.arg
-                    .back_impl(Rc::new(Tensor::mul(&g, &upstream).unwrap())),
-            ),
-            // name: self.op.name(),
+            arg: Box::new(self.arg.back_impl(g))
         })
     }
 }
 
 impl ReduceOpResult {
-    fn back(&self, _upstream: Rc<Tensor>) -> DTrace {
-        todo!()
+    fn back(&self, upstream: Rc<Tensor>) -> DTrace {
+        let g = self.op.get_grads(upstream, Rc::new(self.arg.val()));
+        DTrace::ReduceOp(ReduceOpTrace {
+            arg: Box::new(self.arg.back_impl(g)),
+        })
     }
 }
 
@@ -106,6 +112,7 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
             _accum_grads(&op.arg2, map);
         }
         DTrace::UnaryOp(op) => _accum_grads(&op.arg, map),
+        DTrace::ReduceOp(op) => _accum_grads(&op.arg, map),
         DTrace::DParamDX(param) => {
             let name = param.param_name.to_string();
 
@@ -125,7 +132,7 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
 
 #[cfg(test)]
 mod tests {
-    use crate::ops::{add, mean};
+    use crate::ops::{add, mean, mul};
 
     use super::*;
 
@@ -153,5 +160,31 @@ mod tests {
         let y = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
 
         let (val, grads_map) = grad!(forward, x, y);
+    }
+
+
+    #[test]
+    fn test_grads_3() {
+        fn forward(x: Tensor, y: Tensor) -> Rc<Node> {
+            let x = Rc::new(Node::TensorParam(x, "x"));
+            let y = Rc::new(Node::TensorParam(y, "y"));
+            mul(mean(x), y)
+        }
+
+        let x = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
+        let y = Tensor::from(&[8.] as &[f64]);
+
+        let (_val, grads_map) = grad!(forward, x, y);
+
+        assert_eq!(grads_map.len(), 2);
+
+        // gradient of x:
+        // explanation: x.n_elem = 4, y = 8, 1/4 * 8 = 2
+        // each element of x should be 2
+        assert_eq!(grads_map.get("x").unwrap().data, &[2., 2., 2., 2.]);
+
+        // gradient of y
+        // explanation: mean(x) = 2.5
+        assert_eq!(grads_map.get("y").unwrap().data, &[2.5]);
     }
 }
