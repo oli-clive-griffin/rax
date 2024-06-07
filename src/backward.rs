@@ -104,7 +104,7 @@ pub fn accum_grads(node: DTrace) -> GradMap {
 }
 
 /// Traverse the trace tree, accumulating gradients and summing gradients
-/// for the same parameter (deduping by name)
+/// for the same parameter (by name)
 fn _accum_grads(node: &DTrace, map: &mut GradMap) {
     match node {
         DTrace::BinOp(op) => {
@@ -133,11 +133,7 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
 #[cfg(test)]
 mod tests {
     use crate::ops::{add, mean, mul};
-
     use super::*;
-
-    // add simpler tests
-
 
     #[test]
     fn test_grads_0() {
