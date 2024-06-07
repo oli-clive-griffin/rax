@@ -2,8 +2,6 @@
 
 A toy deep learning library written in rust, very loosely inspired by the functional patterns of [Jax](https://github.com/google/jax), and also partly by [PyTorch](https://github.com/pytorch/pytorch) and [tinygrad](https://github.com/tinygrad/tinygrad).
 
-I wanted to implement a simple purely functional deep learning library, without having to implement some of the more sophisticated bits of Jax (eg. `grad()`).
-
 The current api looks something like this (if slightly idealized):
 
 ```

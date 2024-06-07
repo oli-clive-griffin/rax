@@ -1,4 +1,5 @@
 use rusty_grad::backward::{accum_grads, GradMap};
+use rusty_grad::grad;
 use rusty_grad::node::Node;
 use rusty_grad::ops::{add, mmul, relu, sqr, sub};
 use rusty_grad::optimizer::{Optimizer, ParamsMap, SGD};
@@ -27,19 +28,11 @@ fn test_train_mlp() {
         x3
     }
 
-    fn forward(params: &ParamsMap, input: Tensor, label: Tensor) -> (Tensor, GradMap) {
+    fn forward(params: &ParamsMap, input: Tensor, label: Tensor) -> Rc<Node> {
         let label = Rc::new(Node::TensorParam(label, "label"));
         let out = model(params, input);
 
-        // let loss = mean(sq(sub(act3, label)));
-        let loss = sqr(sub(out.clone(), label.clone()));
-        // println!("out: {:?}, label: {:?}", out.val().item().unwrap(), label.val().item().unwrap());
-        // println!("loss: {:?}", loss.val().item().unwrap()); // print the tensor, not the node + subtree
-
-        let graph = loss.backwards();
-        let grads_map = accum_grads(graph);
-
-        (loss.val(), grads_map)
+        sqr(sub(out.clone(), label.clone()))
     }
 
     fn train_model() -> ParamsMap {
@@ -58,7 +51,7 @@ fn test_train_mlp() {
         let y = Tensor::rand(&vec![1, 1]);
 
         for i in 0.. {
-            let (loss, grads_map) = forward(&params, x.clone(), y.clone());
+            let (loss, grads_map) = grad!(forward, &params, x.clone(), y.clone());
             params = optim.update(params, grads_map);
 
             if i % 100 == 0 {
@@ -88,13 +81,6 @@ fn test_train_simple() {
         add(a, b)
     }
 
-    fn forward(params: &ParamsMap) -> (Tensor, GradMap) {
-        let out = model(params);
-        let graph = out.backwards();
-        let grads_map = accum_grads(graph);
-        (out.val(), grads_map)
-    }
-
     fn train_model() -> ParamsMap {
         let mut params = ParamsMap(HashMap::from([
             ("a".to_string(), Tensor::rand(&vec![1])),
@@ -104,7 +90,8 @@ fn test_train_simple() {
         let optim = SGD::default();
 
         for i in 0.. {
-            let (loss, grads_map) = forward(&params);
+            let (loss, grads_map) = grad!(model, &params);
+
             params = optim.update(params, grads_map);
 
             if i % 10 == 0 {

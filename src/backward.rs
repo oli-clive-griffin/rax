@@ -80,6 +80,17 @@ impl ReduceOpResult {
 
 pub type GradMap = HashMap<String, Tensor>;
 
+#[macro_export]
+macro_rules! grad {
+    ($forward_fn:expr, $($arg:expr),*) => {
+        {
+            let output = $forward_fn($($arg),*);
+            let dtrace = output.backwards();
+            (output.val(), accum_grads(dtrace))
+        }
+    };
+}
+
 pub fn accum_grads(node: DTrace) -> GradMap {
     let mut map = GradMap::new();
     _accum_grads(&node, &mut map);
@@ -109,5 +120,38 @@ fn _accum_grads(node: &DTrace, map: &mut GradMap) {
             });
 
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ops::{add, mean};
+
+    use super::*;
+
+    #[test]
+    fn test_grads_1() {
+        fn forward(x: Tensor) -> Rc<Node> {
+            let x = Rc::new(Node::TensorParam(x, "x"));
+            mean(x)
+        }
+
+        let x = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
+
+        let (val, grads_map) = grad!(forward, x);
+    }
+
+    #[test]
+    fn test_grads_2() {
+        fn forward(x: Tensor, y: Tensor) -> Rc<Node> {
+            let x = Rc::new(Node::TensorParam(x, "x"));
+            let y = Rc::new(Node::TensorParam(y, "y"));
+            mean(add(x, y))
+        }
+
+        let x = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
+        let y = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
+
+        let (val, grads_map) = grad!(forward, x, y);
     }
 }
