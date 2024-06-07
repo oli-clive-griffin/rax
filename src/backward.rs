@@ -54,13 +54,13 @@ impl Node {
 
 impl BinaryOpResult {
     fn back(&self, upstream: Rc<Tensor>) -> DTrace {
-        let (g1, g2) = self.op.get_grads(
+        let (g_l, g_r) = self.op.get_grads(
             upstream,
             (Rc::new(self.args.0.val()), Rc::new(self.args.1.val())),
         );
         DTrace::BinOp(BinOpTrace {
-            arg1: Box::new(self.args.0.back_impl(g1)),
-            arg2: Box::new(self.args.1.back_impl(g2)),
+            arg1: Box::new(self.args.0.back_impl(g_l)),
+            arg2: Box::new(self.args.1.back_impl(g_r)),
             // name: self.op.name(),
         })
     }
@@ -136,55 +136,54 @@ mod tests {
 
     use super::*;
 
+    // add simpler tests
+
+
+    #[test]
+    fn test_grads_0() {
+        fn forward(a: Tensor, b: Tensor) -> Rc<Node> {
+            let a = Rc::new(Node::TensorParam(a, "a"));
+            let b = Rc::new(Node::TensorParam(b, "b"));
+            add(a, b)
+        }
+
+        let a = Tensor::from(&[1.] as &[f64]);
+        let b = Tensor::from(&[2.] as &[f64]);
+
+        let (_val, grads_map) = grad!(forward, a, b);
+
+        assert_eq!(grads_map.len(), 2);
+    }
+
     #[test]
     fn test_grads_1() {
-        fn forward(x: Tensor) -> Rc<Node> {
-            let x = Rc::new(Node::TensorParam(x, "x"));
-            mean(x)
+        fn forward(a: Tensor, b: Tensor) -> Rc<Node> {
+            let a = Rc::new(Node::TensorParam(a, "a"));
+            let b = Rc::new(Node::TensorParam(b, "b"));
+            mul(mean(a), b)
         }
 
-        let x = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
-
-        let (val, grads_map) = grad!(forward, x);
-    }
-
-    #[test]
-    fn test_grads_2() {
-        fn forward(x: Tensor, y: Tensor) -> Rc<Node> {
-            let x = Rc::new(Node::TensorParam(x, "x"));
-            let y = Rc::new(Node::TensorParam(y, "y"));
-            mean(add(x, y))
-        }
-
-        let x = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
-        let y = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
-
-        let (val, grads_map) = grad!(forward, x, y);
-    }
+        let a = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
+        let b = Tensor::from(&[8.] as &[f64]);
 
 
-    #[test]
-    fn test_grads_3() {
-        fn forward(x: Tensor, y: Tensor) -> Rc<Node> {
-            let x = Rc::new(Node::TensorParam(x, "x"));
-            let y = Rc::new(Node::TensorParam(y, "y"));
-            mul(mean(x), y)
-        }
-
-        let x = Tensor::from(&[1., 2., 3., 4.] as &[f64]);
-        let y = Tensor::from(&[8.] as &[f64]);
-
-        let (_val, grads_map) = grad!(forward, x, y);
+        let (_val, grads_map) = grad!(forward, a, b);
 
         assert_eq!(grads_map.len(), 2);
 
         // gradient of x:
-        // explanation: x.n_elem = 4, y = 8, 1/4 * 8 = 2
-        // each element of x should be 2
-        assert_eq!(grads_map.get("x").unwrap().data, &[2., 2., 2., 2.]);
+        // ∂x_i / mul(mean(a), b) = 1/len(a) * b
+        //                        = 1/4 * 8
+        //                        = 2
+        assert_eq!(grads_map.get("a").unwrap().data, &[2., 2., 2., 2.]);
 
-        // gradient of y
-        // explanation: mean(x) = 2.5
-        assert_eq!(grads_map.get("y").unwrap().data, &[2.5]);
+        // gradient of y:
+        // ∂y / mul(mean(a), b) = mean(a)
+        //                      = 2.5
+        assert_eq!(grads_map.get("b").unwrap().item().unwrap(), 2.5);
+
+        // formulae:
+        // ∂x_i / mean(x) = 1/len(x)
+        // ∂x / x * y = y
     }
 }

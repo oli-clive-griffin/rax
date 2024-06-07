@@ -56,10 +56,11 @@ impl BinaryOp for SubOp {
 pub struct MulOp;
 impl BinaryOp for MulOp {
     fn get_grads(&self, upstream: Rc<Tensor>, (l, r): (Rc<Tensor>, Rc<Tensor>)) -> (Rc<Tensor>, Rc<Tensor>) {
-        (
-            Rc::new(Tensor::mul(&l.clone(), &upstream.clone()).unwrap()),
+        let asdf = (
             Rc::new(Tensor::mul(&r.clone(), &upstream.clone()).unwrap()),
-        )
+            Rc::new(Tensor::mul(&l.clone(), &upstream.clone()).unwrap()),
+        );
+        asdf
     }
     fn name(&self) -> &'static str {
         "Mul"
@@ -92,8 +93,8 @@ impl ReduceOp for MeanOp {
     /// gradient of mean is 1/n
     /// where n is the number of elements in the input tensor
     fn get_grads(&self, upstream: Rc<Tensor>, arg: Rc<Tensor>) -> Rc<Tensor> {
-        let upstream  = Tensor::div(&upstream, &Tensor::from(self.input_n_elements as f64)).unwrap();
-        let out = Tensor::mul(&upstream, &arg).unwrap();
+        let upstream2  = Tensor::div(&upstream, &Tensor::from(self.input_n_elements as f64)).unwrap();
+        let out = Tensor::mul(&upstream2, &Tensor::ones(arg.size())).unwrap();
         Rc::new(out)
     }
 }

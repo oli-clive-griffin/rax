@@ -313,6 +313,15 @@ impl Tensor {
     pub fn mmul(l: &Tensor, r: &Tensor) -> Tensor {
         l.matmul(r)
     }
+    
+    pub fn ones(shape: &[usize]) -> Tensor {
+        let capacity = shape.iter().product();
+        Tensor {
+            data: vec![1.; capacity],
+            shape: shape.to_vec(),
+            stride: Tensor::get_postfix_prod(shape),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
